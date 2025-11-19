@@ -920,7 +920,7 @@ struct ImporterView: View {
                 Button {
                     Task { await mgr.importAll(options: options) }
                 } label: {
-                    Label("Import", systemImage: "square.and.arrow.down")
+                    Label("Scan & Import", systemImage: "square.and.arrow.down")
                 }
                 .disabled(mgr.destinationURL == nil || mgr.isImporting)
 
