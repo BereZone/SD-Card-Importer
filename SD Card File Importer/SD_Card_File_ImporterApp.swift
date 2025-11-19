@@ -1,11 +1,3 @@
-// Video File Importer
-// v1 features:
-//  • Detects mounted camera cards
-//  • Lets you grant access to SD cards
-//  • Scans typical camera layouts (DJI DCIM/DJI_001, Sony M4ROOT/CLIP, AVCHD, etc.)
-//  • Copies or moves files to a destination using folder scheme:
-//      <Bucket>/<YYYY>/<MM_Month>/<DD>/<filename>
-//  • Dry Run option, optional auto-eject, simple duplicate skip
 import SwiftUI
 import Combine
 import AVFoundation
@@ -26,6 +18,18 @@ struct ImportCandidate: Identifiable {
     let fileSize: UInt64
 }
 
+// NEW: Possible bucket names for the dropdown
+let predefinedBuckets = [
+    "Auto-Detect",
+    "Pocket3 Videos",
+    "Action4 Videos",
+    "A7C Videos",
+    "A7C Photos",
+    "Mini4Pro Videos",
+    "Phone Videos",
+    "Custom..."
+]
+
 // MARK: - Import Manager
 
 final class ImportManager: ObservableObject {
@@ -38,59 +42,110 @@ final class ImportManager: ObservableObject {
     @Published var debugScan: Bool = false
 
     // Destination bookmark (where files are imported to)
-    @AppStorage("destBookmarkData") private var destBookmarkData: Data?
+    @AppStorage("destBookmarkData") var destBookmarkData: Data?
     @Published var destinationURL: URL? = nil {
-        didSet { storeBookmark(for: destinationURL) }
+        didSet {
+            // Only store if not nil to avoid endless loops or crashes
+            if destinationURL != nil {
+                storeBookmark(for: destinationURL)
+            }
+        }
     }
 
     // Security-scoped bookmarks for SD card roots the user granted
-    @AppStorage("sourceBookmarksJSON") private var sourceBookmarksJSON: Data?
+    @AppStorage("sourceBookmarksJSON") var sourceBookmarksJSON: Data?
+
+    // NEW: User-defined bucket for a source path, keyed by path String
+    @AppStorage("customSourceBucketsJSON") var customSourceBucketsJSON: Data?
+    @Published var customBuckets: [String: String] = [:]
 
     // File & scan helpers
-    private let fm = FileManager.default
-    private let videoExts: Set<String> = ["mp4", "mov", "mxf", "mts", "m4v"]
+    let fm = FileManager.default
+    
+    // UPDATED: Allowed extensions for all media
+    let allowedExts: Set<String> = [
+        "mp4", "mov", "mxf", "mts", "m4v", // Videos
+        "arw", "jpg", "jpeg", "heic", "dng", "png" // Photos
+    ]
 
-    // Month labels (stable English names regardless of system locale)
-    private let englishMonthFormatter: DateFormatter = {
+    // Month labels
+    let englishMonthFormatter: DateFormatter = {
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US_POSIX")
         return df
     }()
 
-    // Optional: map specific volume names to bucket names (edit to taste)
-    // Example: if your Pocket 3 card always mounts as “SD_Card”, map it here.
-    private let volumeBucketOverride: [String: String] = [:
-        // "SD_Card": "Pocket3 Videos",
-        // "DJI_DRONE": "Mini4Pro Videos",
-        // "SONY_SD": "A7C Videos",
-    ]
+    // Optional: map specific volume names to bucket names
+    let volumeBucketOverride: [String: String] = [:]
 
     // Bookkeeping for scoped URLs by path
-    private var scopedURLForVolumePath: [String: URL] = [:]
-    private var didAutoPromptThisRun = false
-    private var observers: [NSObjectProtocol] = []
+    var scopedURLForVolumePath: [String: URL] = [:]
+    var didAutoPromptThisRun = false
+    var observers: [NSObjectProtocol] = []
 
     // A session-only set of paths to ignore
-    private var sessionIgnoredPaths = Set<String>()
+    @Published var sessionIgnoredPaths = Set<String>()
 
-    init() { observeMounts() }
+    init() {
+        loadCustomBuckets()
+        observeMounts()
+    }
+    
     deinit {
         let nc = NSWorkspace.shared.notificationCenter
         for o in observers { nc.removeObserver(o) }
     }
+    
+    // MARK: - Custom Bucket Storage
+    
+    func loadCustomBuckets() {
+        guard let data = customSourceBucketsJSON else { return }
+        customBuckets = (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
+    }
+
+    func saveCustomBuckets() {
+        customSourceBucketsJSON = try? JSONEncoder().encode(customBuckets)
+    }
+
+    // Removed 'private' - Accessible to View
+    func getVolumeRootPath(for url: URL) -> String? {
+        let components = url.standardizedFileURL.pathComponents
+        // Typical removable volume path: /Volumes/VOLUME_NAME/...
+        guard components.count >= 3, components[0] == "/", components[1] == "Volumes" else {
+            // If it's not a /Volumes mount, return the root of the file system
+            return url.standardizedFileURL.deletingLastPathComponent().path
+        }
+        
+        // Reconstruct the root path: /Volumes/VOLUME_NAME
+        let rootPath = "/\(components[1])/\(components[2])"
+        return rootPath
+    }
+
+    func setCustomBucket(for url: URL, bucket: String) {
+        guard let path = getVolumeRootPath(for: url) else { return }
+        
+        // Ensure "Custom..." placeholder isn't saved as the actual folder name
+        if bucket == "Auto-Detect" || bucket == "Custom..." {
+            customBuckets.removeValue(forKey: path)
+        } else {
+            customBuckets[path] = bucket
+        }
+        saveCustomBuckets()
+        log("Set custom bucket for \(url.lastPathComponent) to '\(bucket)'")
+    }
 
     // MARK: - Source bookmark storage
 
-    private func loadSourceBookmarkDatas() -> [Data] {
+    func loadSourceBookmarkDatas() -> [Data] {
         guard let data = sourceBookmarksJSON else { return [] }
         return (try? JSONDecoder().decode([Data].self, from: data)) ?? []
     }
 
-    private func saveSourceBookmarkDatas(_ arr: [Data]) {
+    func saveSourceBookmarkDatas(_ arr: [Data]) {
         sourceBookmarksJSON = try? JSONEncoder().encode(arr)
     }
-
-    private func restoreSourceBookmarks() -> [URL] {
+    
+    func restoreSourceBookmarks() -> [URL] {
         var urls: [URL] = []
         scopedURLForVolumePath.removeAll()
         for d in loadSourceBookmarkDatas() {
@@ -112,8 +167,7 @@ final class ImportManager: ObservableObject {
         return urls
     }
 
-    private func appendSourceBookmarks(for urls: [URL]) {
-        // de-dupe by path before saving
+    func appendSourceBookmarks(for urls: [URL]) {
         var existingDatas = loadSourceBookmarkDatas()
         var existingPaths = Set<String>()
 
@@ -129,8 +183,8 @@ final class ImportManager: ObservableObject {
             let p = u.standardizedFileURL.path
             guard !existingPaths.contains(p) else { continue }
             if let d = try? u.bookmarkData(options: [.withSecurityScope],
-                                           includingResourceValuesForKeys: nil,
-                                           relativeTo: nil) {
+                                         includingResourceValuesForKeys: nil,
+                                         relativeTo: nil) {
                 existingDatas.append(d)
                 existingPaths.insert(p)
                 scopedURLForVolumePath[p] = u
@@ -144,10 +198,15 @@ final class ImportManager: ObservableObject {
         log("Attempting to remove '\(url.lastPathComponent)' from list.")
 
         // 1. Add to session ignore list
-        //    This will prevent it from being re-discovered by refreshVolumes()
         sessionIgnoredPaths.insert(pathToRemove)
+        
+        // 2. Remove any custom bucket setting for this path
+        if let root = getVolumeRootPath(for: url) {
+             customBuckets.removeValue(forKey: root)
+             saveCustomBuckets()
+        }
 
-        // 2. Check if it was also a bookmark. If so, remove the bookmark permanently.
+        // 3. Check if it was also a bookmark. If so, remove the bookmark permanently.
         let existingDatas = loadSourceBookmarkDatas()
         var newDatas: [Data] = []
         var didRemoveBookmark = false
@@ -157,12 +216,11 @@ final class ImportManager: ObservableObject {
             if let u = try? URL(resolvingBookmarkData: d, options: [.withSecurityScope],
                                  relativeTo: nil, bookmarkDataIsStale: &stale) {
                 if u.standardizedFileURL.path == pathToRemove {
-                    // This is the one to remove. Stop accessing and don't add to newDatas.
                     u.stopAccessingSecurityScopedResource()
                     didRemoveBookmark = true
                     log("...it was a bookmark. Permanently removing.")
                 } else {
-                    newDatas.append(d) // Keep this one
+                    newDatas.append(d)
                 }
             }
         }
@@ -174,13 +232,12 @@ final class ImportManager: ObservableObject {
             log("...it was not a bookmark. Ignoring for this session.")
         }
         
-        // 3. Refresh the UI list (which will now respect the sessionIgnoredPaths)
-        refreshVolumes(autoPrompt: false) // No need to auto-prompt after an explicit removal
+        refreshVolumes(autoPrompt: false)
     }
     
     // MARK: - Volume observation
 
-    private func observeMounts() {
+    func observeMounts() {
         let nc = NSWorkspace.shared.notificationCenter
         let didMount = nc.addObserver(forName: NSWorkspace.didMountNotification, object: nil, queue: .main) { [weak self] _ in
             self?.log("Volume mounted")
@@ -197,40 +254,38 @@ final class ImportManager: ObservableObject {
 
     func refreshVolumes(autoPrompt: Bool = false) {
         log("Refreshing volumes…")
+        DispatchQueue.main.async { self.candidates = [] }
+        
         var results: [URL] = []
-
-        // Include previously granted sources first (scoped)
         results.append(contentsOf: restoreSourceBookmarks())
 
-        // System-reported volumes (skip hidden); only keep removable camera-like
         if let vols = fm.mountedVolumeURLs(includingResourceValuesForKeys: [.volumeIsInternalKey],
-                                            options: [.skipHiddenVolumes]) {
+                                             options: [.skipHiddenVolumes]) {
             for url in vols {
                 let isInternal = (try? url.resourceValues(forKeys: [.volumeIsInternalKey]).volumeIsInternal) ?? false
+                // isCameraCard accessible here
                 guard !isInternal, isCameraCard(url) else { continue }
                 results.append(url)
             }
         }
 
-        // Fallback: /Volumes pass
         if let names = try? fm.contentsOfDirectory(atPath: "/Volumes") {
             for name in names where !name.isEmpty {
                 let u = URL(fileURLWithPath: "/Volumes/\(name)")
+                // isCameraCard accessible here
                 guard isCameraCard(u) else { continue }
                 results.append(u)
             }
         }
         results.removeAll { $0.standardizedFileURL.path == "/" }
         
-        // Don’t include the destination volume (avoid scanning your import SSD)
+        // destinationVolumeRoot accessible here
         if let destRoot = destinationVolumeRoot() {
             results.removeAll { $0.standardizedFileURL == destRoot.standardizedFileURL }
         }
 
-        // Filter out session-ignored paths
         results.removeAll { sessionIgnoredPaths.contains($0.standardizedFileURL.path) }
 
-        // De-dup by path; prefer scoped URL if available
         var byPath: [String: URL] = [:]
         for u in results {
             let path = u.standardizedFileURL.path
@@ -248,7 +303,6 @@ final class ImportManager: ObservableObject {
         }
         log("Detected camera cards: \(labels)")
 
-        // If we found unscoped camera cards, prompt once this run to grant access
         if autoPrompt, !didAutoPromptThisRun {
             let unscoped = removableVolumes.filter { scopedURLForVolumePath[$0.standardizedFileURL.path] == nil }
             if !unscoped.isEmpty {
@@ -258,7 +312,8 @@ final class ImportManager: ObservableObject {
         }
     }
 
-    private func promptForAccess(to volumes: [URL]) {
+    // Removed 'private' - Accessible to View
+    func promptForAccess(to volumes: [URL]) {
         DispatchQueue.main.async {
             let panel = NSOpenPanel()
             panel.title = "Grant access to SD card"
@@ -270,6 +325,11 @@ final class ImportManager: ObservableObject {
             if panel.runModal() == .OK {
                 for url in panel.urls { _ = url.startAccessingSecurityScopedResource() }
                 self.appendSourceBookmarks(for: panel.urls)
+                
+                for u in panel.urls {
+                    self.sessionIgnoredPaths.remove(u.standardizedFileURL.path)
+                }
+                
                 self.refreshVolumes()
                 self.log("Granted access for: \(panel.urls.map(\.lastPathComponent))")
             } else {
@@ -278,18 +338,18 @@ final class ImportManager: ObservableObject {
         }
     }
 
-    /// Heuristics: treat a volume as a camera card if it contains typical camera markers.
-    private func isCameraCard(_ vol: URL) -> Bool {
+    // Removed 'private' - Accessible to View and Refresh logic
+    func isCameraCard(_ vol: URL) -> Bool {
         let markers = [
             "DCIM",
-            "DCIM/DJI_001",                   // DJI Pocket / DJI cameras
-            "DCIM/100MEDIA",                  // DJI alt
+            "DCIM/DJI_001",           // DJI Pocket / DJI cameras
+            "DCIM/100MEDIA",          // DJI alt
             "PRIVATE/M4ROOT",
-            "PRIVATE/M4ROOT/CLIP",            // Sony XAVC S/HS
+            "PRIVATE/M4ROOT/CLIP",    // Sony XAVC S/HS
             "PRIVATE/AVCHD",
-            "PRIVATE/AVCHD/BDMV/STREAM",      // AVCHD MTS
+            "PRIVATE/AVCHD/BDMV/STREAM", // AVCHD MTS
             "MP_ROOT",
-            "CLIP"                            // some MXF cards
+            "CLIP"                    // some MXF cards
         ]
         for m in markers {
             if fm.fileExists(atPath: vol.appending(path: m).path) { return true }
@@ -297,8 +357,8 @@ final class ImportManager: ObservableObject {
         return false
     }
 
-    /// If destination is on /Volumes/<Name>/..., return the root of that volume
-    private func destinationVolumeRoot() -> URL? {
+    // Removed 'private' - Accessible to View
+    func destinationVolumeRoot() -> URL? {
         guard let dest = destinationURL?.standardizedFileURL else { return nil }
         let c = dest.pathComponents
         guard c.count > 2, c[0] == "/", c[1] == "Volumes" else { return nil }
@@ -307,11 +367,12 @@ final class ImportManager: ObservableObject {
 
     // MARK: - Destination bookmark
 
+    // Removed 'private' - Accessible to View
     func restoreBookmark() {
         guard let data = destBookmarkData else { return }
         var stale = false
         if let url = try? URL(resolvingBookmarkData: data, options: [.withSecurityScope],
-                                relativeTo: nil, bookmarkDataIsStale: &stale) {
+                                 relativeTo: nil, bookmarkDataIsStale: &stale) {
             if url.startAccessingSecurityScopedResource() {
                 destinationURL = url
                 if stale { storeBookmark(for: url) }
@@ -319,17 +380,19 @@ final class ImportManager: ObservableObject {
         }
     }
 
-    private func storeBookmark(for url: URL?) {
+    // Removed 'private' - Accessible to didSet
+    func storeBookmark(for url: URL?) {
         guard let url else { destBookmarkData = nil; return }
         if let data = try? url.bookmarkData(options: [.withSecurityScope],
-                                           includingResourceValuesForKeys: nil,
-                                           relativeTo: nil) {
+                                         includingResourceValuesForKeys: nil,
+                                         relativeTo: nil) {
             destBookmarkData = data
         }
     }
 
     // MARK: - UI actions
 
+    // Removed 'private' - Accessible to View
     func pickDestination() {
         let panel = NSOpenPanel()
         panel.title = "Choose Import Destination"
@@ -344,6 +407,7 @@ final class ImportManager: ObservableObject {
         }
     }
 
+    // Removed 'private' - Accessible to View
     func addSourceVolume() {
         let panel = NSOpenPanel()
         panel.title = "Grant access to SD card"
@@ -353,9 +417,14 @@ final class ImportManager: ObservableObject {
         panel.allowsMultipleSelection = true
         if panel.runModal() == .OK {
             for url in panel.urls { _ = url.startAccessingSecurityScopedResource() }
-            appendSourceBookmarks(for: panel.urls)
-            refreshVolumes()
-            log("Added sources: \(panel.urls.map(\.lastPathComponent))")
+            self.appendSourceBookmarks(for: panel.urls)
+            
+            for u in panel.urls {
+                self.sessionIgnoredPaths.remove(u.standardizedFileURL.path)
+            }
+            
+            self.refreshVolumes()
+            self.log("Granted access for: \(panel.urls.map(\.lastPathComponent))")
         }
     }
 
@@ -378,7 +447,7 @@ final class ImportManager: ObservableObject {
             candidates.append(contentsOf: scanVolume(vol))
             progress = Double(i + 1) / Double(totalVols)
         }
-        log("Found \(candidates.count) video files.")
+        log("Found \(candidates.count) files.")
     }
 
     private func tokenizedURL(for volume: URL) -> URL {
@@ -392,24 +461,26 @@ final class ImportManager: ObservableObject {
         let had = vol.startAccessingSecurityScopedResource()
         defer { if had { vol.stopAccessingSecurityScopedResource() } }
 
-        // Common camera roots
+        // Common camera roots - ORDER MATTERS for de-duplication
         let likelyRoots = [
-            vol.appending(path: "DCIM/DJI_001"),           // DJI
-            vol.appending(path: "DCIM/100MEDIA"),          // DJI alt
-            vol.appending(path: "DCIM"),                   // generic DCIM
-            vol.appending(path: "PRIVATE/M4ROOT/CLIP"),    // Sony XAVC
-            vol.appending(path: "PRIVATE/AVCHD/BDMV/STREAM"), // AVCHD
-            vol.appending(path: "MP_ROOT"),                // older Sony/others
-            vol.appending(path: "CLIP"),                   // MXF
-            vol                                            // fallback
+            vol.appending(path: "PRIVATE/M4ROOT/CLIP"), // Sony Video (most specific)
+            vol.appending(path: "DCIM/DJI_001"),        // DJI standard video
+            vol.appending(path: "DCIM/100MEDIA"),       // DJI alt video
+            vol.appending(path: "DCIM"),                // Generic DCIM (Photos & general fallback)
+            vol.appending(path: "PRIVATE/AVCHD/BDMV/STREAM"),
+            vol.appending(path: "MP_ROOT"),
+            vol.appending(path: "CLIP"),
         ]
 
         let keys: [URLResourceKey] = [.isDirectoryKey, .isHiddenKey, .fileSizeKey, .creationDateKey]
         var seenRoots = Set<URL>()
+        
+        // Tracks standardized file path to prevent duplicates
         var seenFiles = Set<String>()
 
         for root in likelyRoots {
             guard fm.fileExists(atPath: root.path) else { continue }
+            
             if seenRoots.contains(root) { continue }
             seenRoots.insert(root)
 
@@ -420,9 +491,14 @@ final class ImportManager: ObservableObject {
                 for case let item as URL in e {
                     if accept(url: item, keys: keys) {
                         let p = item.standardizedFileURL.path
-                        if seenFiles.insert(p).inserted { appendCandidate(url: item, into: &found) }
+                        // Check if file path is already seen before appending
+                        if seenFiles.insert(p).inserted {
+                             appendCandidate(url: item, into: &found)
+                        } else if debugScan {
+                             log("DBG skip duplicate: \(item.lastPathComponent)")
+                        }
                     } else if debugScan {
-                        log("DBG skip: \(item.lastPathComponent)")
+                        log("DBG skip excluded: \(item.lastPathComponent)")
                     }
                 }
             }
@@ -432,9 +508,14 @@ final class ImportManager: ObservableObject {
                 recursiveWalk(root, keys: keys) { item in
                     if accept(url: item, keys: keys) {
                         let p = item.standardizedFileURL.path
-                        if seenFiles.insert(p).inserted { appendCandidate(url: item, into: &found) }
+                        // Check if file path is already seen before appending
+                        if seenFiles.insert(p).inserted {
+                            appendCandidate(url: item, into: &found)
+                        } else if debugScan {
+                             log("DBG skip duplicate(rec): \(item.lastPathComponent)")
+                        }
                     } else if debugScan {
-                        log("DBG skip(rec): \(item.lastPathComponent)")
+                        log("DBG skip excluded(rec): \(item.lastPathComponent)")
                     }
                 }
             }
@@ -472,8 +553,13 @@ final class ImportManager: ObservableObject {
             if vals.isHidden == true { return false }
         }
         let name = url.lastPathComponent.lowercased()
-        if name.hasSuffix(".lrv") || name.hasSuffix(".lrf") || name.hasSuffix(".thm") { return false } // DJI proxies/thumbnails
-        return videoExts.contains(url.pathExtension.lowercased())
+        
+        // Exclude common proxy/thumbnail markers
+        if name.hasSuffix(".lrv") || name.hasSuffix(".lrf") || name.hasSuffix(".thm") || name.contains("_t") {
+            return false
+        }
+        
+        return allowedExts.contains(url.pathExtension.lowercased())
     }
 
     private func appendCandidate(url: URL, into arr: inout [ImportCandidate]) {
@@ -544,20 +630,42 @@ final class ImportManager: ObservableObject {
     // Build: <Bucket>/<YYYY>/<MM_Month>/<DD>/<filename>
 
     private func cameraBucket(for c: ImportCandidate) -> String {
-        // 1) Volume-name override (most reliable if you set it)
+        let sourcePath = c.url.standardizedFileURL.path
+        
+        // --- 1. USER'S CUSTOM CHOICE (Highest Priority) ---
+        if let volumeRootPath = getVolumeRootPath(for: c.url),
+           let customBucket = customBuckets[volumeRootPath] {
+             
+            return customBucket
+        }
+        
+        // 2) Volume-name override (most reliable if you set it)
         if let volName = c.url.pathComponents.dropFirst(2).first, // "/Volumes/<Name>/…"
            let mapped = volumeBucketOverride[volName] {
             return mapped
         }
 
-        // 2) Path heuristics / filename patterns
+        // 3) Path heuristics / filename patterns (Fallback)
         let p = c.url.standardizedFileURL.path.lowercased()
+        
+        // --- SONY PHOTO DETECTION ---
+        // If it's an ARW, or inside a folder like "100MSDCF", it's a Sony Photo.
+        if c.url.pathExtension.lowercased() == "arw" || p.contains("msdcf") {
+             return "A7C Photos"
+        }
+        
+        // Pocket 3 (using .LRF proxy as definitive marker)
+        let proxyBase = c.url.deletingPathExtension()
+        let hasPocket3Proxy = fm.fileExists(atPath: proxyBase.appendingPathExtension("LRF").path)
+            || fm.fileExists(atPath: proxyBase.appendingPathExtension("lrf").path)
 
-        // DJI Pocket 3 (DCIM/DJI_001, often with .LRF proxies)
-        if p.contains("/dcim/dji_001")
-            || fm.fileExists(atPath: c.url.deletingPathExtension().appendingPathExtension("LRF").path)
-            || fm.fileExists(atPath: c.url.deletingPathExtension().appendingPathExtension("lrf").path) {
+        if hasPocket3Proxy {
             return "Pocket3 Videos"
+        }
+        
+        // Action 4 / Generic DJI (Default for dji_001 if no proxy found)
+        if p.contains("/dcim/dji_001") {
+            return "Action4 Videos"
         }
 
         // Sony A7C / XAVC S/HS
@@ -567,15 +675,13 @@ final class ImportManager: ObservableObject {
 
         // DJI drones / action (100MEDIA)
         if p.contains("/dcim/100media") {
-            return "Mini4Pro Videos" // change to "Action4 Videos" if you prefer
+            return "Drone Videos"
         }
 
         return "Imported Videos" // fallback bucket
     }
 
     // Build: <Bucket>/<YYYY>/<MM_Month>/<DD>/<filename>
-    // …but DO NOT duplicate segments if the user already chose a deeper folder
-    // (e.g., they pointed the destination at “…/Pocket3 Videos” or “…/2025/10_October/28”).
     private func buildDestination(for c: ImportCandidate, root: URL) -> URL {
         let cal = Calendar(identifier: .gregorian)
         let y  = cal.component(.year,  from: c.date)
@@ -584,7 +690,7 @@ final class ImportManager: ObservableObject {
 
         let monthName   = englishMonthFormatter.monthSymbols[m - 1]
         let monthFolder = String(format: "%02d_%@", m, monthName) // "10_October"
-        let dayFolder   = String(format: "%02d", d)               // "28"
+        let dayFolder   = String(format: "%02d", d)              // "28"
 
         let bucket = cameraBucket(for: c)
 
@@ -647,6 +753,9 @@ final class ImportManager: ObservableObject {
 struct ImporterView: View {
     @StateObject private var mgr = ImportManager()
     @State private var options = ImportOptions()
+    
+    // State to track the custom folder name input for the current volume
+    @State private var tempCustomBucketName: [String: String] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -667,7 +776,9 @@ struct ImporterView: View {
                     Button { mgr.clearIgnoresAndRefresh(autoPrompt: true) } label: {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
-                    Button { mgr.addSourceVolume() } label: {
+                    Button {
+                        mgr.addSourceVolume()
+                    } label: {
                         Label("Add SD Card…", systemImage: "plus")
                     }
                     Toggle("Debug scan", isOn: $mgr.debugScan).toggleStyle(.switch)
@@ -678,27 +789,122 @@ struct ImporterView: View {
                     Text("No removable volumes found.")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(mgr.removableVolumes, id: \.self) { url in
-                        HStack {
-                            Image(systemName: "externaldrive")
-                            Text(url.lastPathComponent)
-                            Text(url.path)
-                                .foregroundStyle(.secondary)
-                                .font(.caption)
-                            Spacer()
-                            Button(role: .destructive) {
-                                mgr.removeVolumeFromList(for: url)
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
+                    LazyVStack(spacing: 8) {
+                        ForEach(mgr.removableVolumes, id: \.self) { url in
+                            let volumeKey = mgr.getVolumeRootPath(for: url) ?? ""
+                            let currentSavedBucket = mgr.customBuckets[volumeKey] ?? "Auto-Detect"
+                            
+                            // Determine if the saved bucket is a custom string (not in the predefined list)
+                            let isCustomSaved = !predefinedBuckets.contains(currentSavedBucket) && currentSavedBucket != "Auto-Detect"
+                            
+                            // Determine if the picker is currently showing the "Custom..." option
+                            let isPickerCustom = (currentSavedBucket == "Custom..." || isCustomSaved)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Image(systemName: "externaldrive")
+                                    Text(url.lastPathComponent)
+                                    Text(url.path)
+                                        .foregroundStyle(.secondary)
+                                        .font(.caption)
+                                    Spacer()
+                                    
+                                    // Custom Bucket Picker
+                                    Picker("Import Bucket", selection: Binding(
+                                        get: {
+                                            if isCustomSaved {
+                                                // If we have a saved custom name, we ensure the local temp state matches it
+                                                // so the text field isn't empty if they switch back to "Custom..."
+                                                if self.tempCustomBucketName[volumeKey] == nil {
+                                                    DispatchQueue.main.async {
+                                                        self.tempCustomBucketName[volumeKey] = currentSavedBucket
+                                                    }
+                                                }
+                                                return "Custom..."
+                                            }
+                                            return currentSavedBucket
+                                        },
+                                        set: { selectedBucket in
+                                            if selectedBucket != "Custom..." {
+                                                // Standard selection: save it directly and clear the custom input state
+                                                mgr.setCustomBucket(for: url, bucket: selectedBucket)
+                                                self.tempCustomBucketName.removeValue(forKey: volumeKey)
+                                            } else {
+                                                // Selected "Custom...": initialize TextField state
+                                                let initialName = self.tempCustomBucketName[volumeKey] ?? currentSavedBucket
+                                                let newCustomName = isCustomSaved ? initialName : "Custom Project"
+                                                
+                                                self.tempCustomBucketName[volumeKey] = newCustomName
+                                                
+                                                // We only save "Custom..." as a marker if the temp name isn't ready,
+                                                // or we leave it pending user input.
+                                                if newCustomName == "Custom Project" {
+                                                     mgr.setCustomBucket(for: url, bucket: newCustomName)
+                                                }
+                                            }
+                                        }
+                                    )) {
+                                        ForEach(predefinedBuckets, id: \.self) { bucketName in
+                                            Text(bucketName).tag(bucketName)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .frame(width: 150)
+                                    
+                                    // Remove Button
+                                    Button(role: .destructive) {
+                                        mgr.removeVolumeFromList(for: url)
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                    }
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(.secondary)
+                                    .contentShape(Rectangle())
+                                }
+                                
+                                // Conditional TextField for Custom Folder Name
+                                if isPickerCustom {
+                                    HStack {
+                                        Text("Folder:")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        
+                                        TextField("Enter custom folder name", text: Binding(
+                                            get: {
+                                                // Use temp state if available, otherwise fallback to saved state
+                                                return self.tempCustomBucketName[volumeKey] ?? (isCustomSaved ? currentSavedBucket : "Custom Project")
+                                            },
+                                            set: { newValue in
+                                                // Update ONLY the local temp state on keystroke
+                                                self.tempCustomBucketName[volumeKey] = newValue
+                                            }
+                                        ))
+                                        .textFieldStyle(.roundedBorder)
+                                        .onSubmit {
+                                            // Commit to manager only on Return/Focus Loss
+                                            if let newBucket = self.tempCustomBucketName[volumeKey], !newBucket.isEmpty {
+                                                mgr.setCustomBucket(for: url, bucket: newBucket)
+                                            } else {
+                                                mgr.setCustomBucket(for: url, bucket: "Custom Project")
+                                                self.tempCustomBucketName[volumeKey] = "Custom Project"
+                                            }
+                                        }
+                                        .frame(maxWidth: 300)
+                                    }
+                                    .padding(.leading, 20)
+                                } else if isCustomSaved {
+                                    Text("Saved Custom Folder: \(currentSavedBucket)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .padding(.leading, 20)
+                                }
                             }
-                            .buttonStyle(.plain) // Keeps it from highlighting the whole row
-                            .foregroundStyle(.secondary)
-                            .contentShape(Rectangle()) // Makes the click target bigger
+                            Divider()
                         }
                     }
                 }
             }
-
+            
             // Options
             GroupBox("Options") {
                 Toggle("Dry run (don’t actually copy/move)", isOn: $options.dryRun)
