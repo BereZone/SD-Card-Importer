@@ -1,0 +1,22 @@
+# Xcode
+.DS_Store
+*.xcodeproj/xcuserdata/
+*.xcuserdatad/
+DerivedData/
+build/
+
+# Swift Package Manager
+.build/
+
+# Carthage
+Carthage/Build/
+
+# CocoaPods
+Pods/
+
+# Optional: Screenshots (if not managed by Fastlane or similar)
+*.png
+*.jpg
+
+# Optional: API Keys / Sensitive Data (if stored in config files)
+*.xcconfig
