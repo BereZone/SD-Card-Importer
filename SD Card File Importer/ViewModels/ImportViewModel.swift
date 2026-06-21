@@ -11,6 +11,7 @@ final class ImportViewModel: ObservableObject {
     private let scanner = FileScanningService()
     private let importer = FileImportService()
     private let profileManager = CameraProfileManager.shared
+    private var importTask: Task<Void, Never>?
     
     // State
     @Published var removableVolumes: [URL] = []

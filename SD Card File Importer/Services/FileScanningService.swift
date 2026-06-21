@@ -41,7 +41,7 @@ struct FileScanningService: Sendable {
     ///   - debugScan: If `true`, logs hidden and excluded files.
     ///   - log: A closure for logging scanning progress.
     /// - Returns: An array of `ImportCandidate` objects representing discovered media files.
-    func scanVolume(_ volume: URL, tokenizedURL: URL, debugScan: Bool, log: (String) -> Void) -> [ImportCandidate] {
+    func scanVolume(_ volume: URL, tokenizedURL: URL, debugScan: Bool, log: @Sendable (String) -> Void) -> [ImportCandidate] {
         var found: [ImportCandidate] = []
         
         let vol = tokenizedURL
