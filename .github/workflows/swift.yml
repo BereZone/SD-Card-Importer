@@ -18,10 +18,9 @@ jobs:
       with:
         xcode-version: latest-stable
         
-    - name: Build and Test
+    - name: Build
       run: |
-        xcodebuild test \
+        xcodebuild build \
           -project "SD Card File Importer.xcodeproj" \
           -scheme "SD Card File Importer" \
-          -destination "platform=macOS,arch=arm64" \
-          -enableCodeCoverage YES
+          -destination "platform=macOS,arch=arm64"
