@@ -160,6 +160,13 @@ final class ImportViewModel: ObservableObject {
         }
         
         let isDebug = debugScan
+        
+        let logMsg: @Sendable (String) -> Void = { msg in
+            Task { @MainActor [weak self] in self?.log(msg) }
+        }
+        let updateProgress: @Sendable (Double) -> Void = { p in
+            Task { @MainActor [weak self] in self?.progress = p }
+        }
 
         Task {
             let foundCandidates = await Task.detached(priority: .userInitiated) { () -> [ImportCandidate] in
@@ -167,14 +174,11 @@ final class ImportViewModel: ObservableObject {
                 let service = FileScanningService()
                 
                 for (i, (vol, tokenized)) in volumeData.enumerated() {
-                    await MainActor.run {
-                         self.log("• \(vol.path)")
-                         self.progress = Double(i) / Double(totalVols)
-                    }
+                    let progressVal = Double(i) / Double(totalVols)
+                    logMsg("• \(vol.path)")
+                    updateProgress(progressVal)
                     
-                    let found = service.scanVolume(vol, tokenizedURL: tokenized, debugScan: isDebug) { msg in
-                        Task { @MainActor in self.log(msg) }
-                    }
+                    let found = service.scanVolume(vol, tokenizedURL: tokenized, debugScan: isDebug, log: logMsg)
                     results.append(contentsOf: found)
                 }
                 return results
