@@ -5,11 +5,9 @@ import AppKit
 
 struct ActivityLogSection: View {
     @ObservedObject var vm: ImportViewModel
-    @State private var logHeight: CGFloat = 120
-    @State private var dragStartHeight: CGFloat = 120
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+
             HStack {
                 Image(systemName: "terminal.fill")
                     .font(.title2)
@@ -23,23 +21,6 @@ struct ActivityLogSection: View {
                         color: .accentPrimary
                     )
                 }
-                
-                Button(action: { 
-                    withAnimation { 
-                        if logHeight <= 120 {
-                            logHeight = 400
-                            dragStartHeight = 400
-                        } else {
-                            logHeight = 120
-                            dragStartHeight = 120
-                        }
-                    } 
-                }) {
-                    Image(systemName: logHeight <= 120 ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
             }
             
             ScrollViewReader { proxy in
@@ -50,42 +31,13 @@ struct ActivityLogSection: View {
                         }
                     }
                 }
-                .frame(height: max(80, logHeight))
+                .frame(maxHeight: .infinity)
                 .onChange(of: vm.logLines) { _, _ in
                     withAnimation {
                         proxy.scrollTo(max(0, vm.logLines.count - 1), anchor: .bottom)
                     }
                 }
             }
-            
-            // Drag handle
-            HStack {
-                Spacer()
-                Capsule()
-                    .fill(Color.secondary.opacity(0.3))
-                    .frame(width: 40, height: 4)
-                Spacer()
-            }
-            .padding(.top, 4)
-            .padding(.bottom, 2)
-            .contentShape(Rectangle())
-            .onHover { isHovering in
-                if isHovering {
-                    NSCursor.resizeUpDown.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        let newHeight = dragStartHeight + value.translation.height
-                        logHeight = max(80, newHeight)
-                    }
-                    .onEnded { value in
-                        dragStartHeight = logHeight
-                    }
-            )
         }
         .modernCard(accentColor: .accentPrimary)
     }

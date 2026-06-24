@@ -16,20 +16,38 @@ struct ImporterView: View {
             )
             .ignoresSafeArea()
             
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    appHeader
-                    DestinationCard(vm: vm)
-                    SDCardsSection(vm: vm)
-                    OptionsCard(options: $vm.options)
-                    actionButtons
-                    FileListSection(vm: vm)
-                    ActivityLogSection(vm: vm)
+            HSplitView {
+                // Left Column: Controls
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        appHeader
+                        
+                        HStack(alignment: .top, spacing: 16) {
+                            DestinationCard(vm: vm)
+                            SDCardsSection(vm: vm)
+                        }
+                        
+                        HStack(alignment: .top, spacing: 16) {
+                            OptionsCard(options: $vm.options)
+                            actionCard
+                        }
+                        
+                        FileListSection(vm: vm)
+                    }
+                    .padding(16)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
                 }
-                .padding(16)
+                .frame(minWidth: 450)
+                .layoutPriority(1)
+                
+                // Right Column: Activity Log
+                ActivityLogSection(vm: vm)
+                    .padding(16)
+                    .frame(minWidth: 300)
             }
         }
-        .frame(minWidth: 700, minHeight: 600)
+        .frame(minWidth: 1000, minHeight: 650)
     }
     
     private var appHeader: some View {
@@ -54,43 +72,59 @@ struct ImporterView: View {
         }
     }
     
-    private var actionButtons: some View {
-        HStack(spacing: 16) {
-            Button {
-                withAnimation {
-                    vm.scanForCandidates()
-                }
-            } label: {
-                Label("Scan SD Cards", systemImage: "magnifyingglass.circle.fill")
+    private var actionCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "play.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.accentPrimary)
+                Text("Actions")
+                    .sectionHeader()
             }
-            .buttonStyle(SecondaryButtonStyle())
             
-            Button {
-                Task {
-                    await vm.importAll()
+            VStack(spacing: 16) {
+                Button {
+                    withAnimation {
+                        vm.scanForCandidates()
+                    }
+                } label: {
+                    Label("Scan SD Cards", systemImage: "magnifyingglass.circle.fill")
+                        .frame(maxWidth: .infinity)
                 }
-            } label: {
-                Label("Start Import", systemImage: "square.and.arrow.down.fill")
-            }
-            .buttonStyle(PremiumButtonStyle(color: .successGreen))
-            .disabled(vm.destinationURL == nil || vm.isImporting)
-            .opacity((vm.destinationURL == nil || vm.isImporting) ? 0.5 : 1.0)
-            
-            Spacer()
-            
-            if vm.isImporting || vm.progress > 0 {
-                HStack(spacing: 8) {
-                    ProgressView(value: vm.progress)
-                        .progressViewStyle(.linear)
-                        .tint(.accentPrimary)
-                        .frame(width: 180)
-                    Text("\(Int(vm.progress * 100))%")
-                        .font(.system(.caption, design: .rounded).weight(.semibold))
-                        .foregroundColor(.accentPrimary)
-                        .frame(width: 40)
+                .buttonStyle(SecondaryButtonStyle())
+                
+                Button {
+                    Task {
+                        await vm.importAll()
+                    }
+                } label: {
+                    Label("Start Import", systemImage: "square.and.arrow.down.fill")
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(PremiumButtonStyle(color: .successGreen))
+                .disabled(vm.destinationURL == nil || vm.isImporting)
+                .opacity((vm.destinationURL == nil || vm.isImporting) ? 0.5 : 1.0)
+                
+                if vm.isImporting || vm.progress > 0 {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Progress")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(Int(vm.progress * 100))%")
+                                .font(.caption.weight(.bold))
+                                .foregroundColor(.accentPrimary)
+                        }
+                        ProgressView(value: vm.progress)
+                            .progressViewStyle(.linear)
+                            .tint(.accentPrimary)
+                    }
+                }
+                
+                Spacer(minLength: 0)
             }
         }
-        .padding(.vertical, 4)
+        .modernCard(accentColor: .accentPrimary)
     }
 }
