@@ -23,4 +23,6 @@ jobs:
         xcodebuild build \
           -project "SD Card File Importer.xcodeproj" \
           -scheme "SD Card File Importer" \
-          -destination "platform=macOS,arch=arm64"
+          -destination "platform=macOS,arch=arm64" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO
