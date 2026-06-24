@@ -42,36 +42,42 @@ struct FileImportService: Sendable {
             throw ImporterError.writeFailed(path: dst.path)
         }
         
-        guard let outHandle = try? FileHandle(forWritingTo: dst) else {
-            throw ImporterError.writeFailed(path: dst.path)
-        }
-        defer { try? outHandle.close() }
-        
-        let attrs = try? fm.attributesOfItem(atPath: src.path)
-        let totalSize = (attrs?[.size] as? NSNumber)?.doubleValue ?? 0
-        var bytesCopied: Double = 0
-        
-        while true {
-            try Task.checkCancellation()
-            
-            guard let chunk = try? inHandle.read(upToCount: 1024 * 1024) else {
-                throw ImporterError.readFailed(path: src.path)
-            }
-            if chunk.isEmpty { break }
-            
-            do {
-                try outHandle.write(contentsOf: chunk)
-                bytesCopied += Double(chunk.count)
-                if totalSize > 0 {
-                    onProgress?(bytesCopied / totalSize)
-                }
-            } catch {
+        do {
+            guard let outHandle = try? FileHandle(forWritingTo: dst) else {
                 throw ImporterError.writeFailed(path: dst.path)
             }
-        }
-        
-        if let attrs {
-            try? fm.setAttributes(attrs, ofItemAtPath: dst.path)
+            defer { try? outHandle.close() }
+            
+            let attrs = try? fm.attributesOfItem(atPath: src.path)
+            let totalSize = (attrs?[.size] as? NSNumber)?.doubleValue ?? 0
+            var bytesCopied: Double = 0
+            
+            while true {
+                try Task.checkCancellation()
+                
+                guard let chunk = try? inHandle.read(upToCount: 1024 * 1024) else {
+                    throw ImporterError.readFailed(path: src.path)
+                }
+                if chunk.isEmpty { break }
+                
+                do {
+                    try outHandle.write(contentsOf: chunk)
+                    bytesCopied += Double(chunk.count)
+                    if totalSize > 0 {
+                        onProgress?(bytesCopied / totalSize)
+                    }
+                } catch {
+                    throw ImporterError.writeFailed(path: dst.path)
+                }
+            }
+            
+            if let attrs {
+                try? fm.setAttributes(attrs, ofItemAtPath: dst.path)
+            }
+        } catch {
+            // If the copy was cancelled or failed, clean up the corrupted partial file
+            try? fm.removeItem(at: dst)
+            throw error
         }
     }
     
