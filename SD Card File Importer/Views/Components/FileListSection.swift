@@ -1,7 +1,9 @@
 import SwiftUI
+import QuickLook
 
 struct FileListSection: View {
     @ObservedObject var vm: ImportViewModel
+    @State private var previewURL: URL?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -72,17 +74,19 @@ struct FileListSection: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 6) {
                 ForEach(vm.candidates) { c in
-                    FileRow(candidate: c, vm: vm)
+                    FileRow(candidate: c, vm: vm, previewURL: $previewURL)
                 }
             }
         }
         .frame(maxHeight: 200)
+        .quickLookPreview($previewURL)
     }
 }
 
 struct FileRow: View {
     let candidate: ImportCandidate
     @ObservedObject var vm: ImportViewModel
+    @Binding var previewURL: URL?
     
     var body: some View {
         let ext = candidate.url.pathExtension.lowercased()
@@ -95,28 +99,35 @@ struct FileRow: View {
             .toggleStyle(.checkbox)
             .labelsHidden()
             
-            ThumbnailView(url: candidate.url, size: 32, show: vm.showPreviews)
             
-            VStack(alignment: .leading, spacing: 2) {
-                Text(candidate.url.lastPathComponent)
-                    .font(.system(.body, design: .rounded))
-                    .lineLimit(1)
-                Text(byteCount(candidate.fileSize))
-                    .font(.system(.caption, design: .monospaced))
+            HStack(spacing: 10) {
+                ThumbnailView(url: candidate.url, size: 32, show: vm.showPreviews)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(candidate.url.lastPathComponent)
+                        .font(.system(.body, design: .rounded))
+                        .lineLimit(1)
+                    Text(byteCount(candidate.fileSize))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Text(ext.uppercased())
+                    .font(.system(.caption2, design: .rounded).weight(.bold))
                     .foregroundColor(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.15))
+                    )
             }
-            
-            Spacer()
-            
-            Text(ext.uppercased())
-                .font(.system(.caption2, design: .rounded).weight(.bold))
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(
-                    Capsule()
-                        .fill(Color.secondary.opacity(0.15))
-                )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                previewURL = candidate.url
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
