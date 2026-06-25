@@ -55,14 +55,20 @@ struct FileImportService: Sendable {
             while true {
                 try Task.checkCancellation()
                 
-                guard let chunk = try? inHandle.read(upToCount: 1024 * 1024) else {
+                let chunk: Data?
+                do {
+                    chunk = try inHandle.read(upToCount: 1024 * 1024)
+                } catch {
                     throw ImporterError.readFailed(path: src.path)
                 }
-                if chunk.isEmpty { break }
+                
+                guard let chunkData = chunk, !chunkData.isEmpty else {
+                    break // EOF
+                }
                 
                 do {
-                    try outHandle.write(contentsOf: chunk)
-                    bytesCopied += Double(chunk.count)
+                    try outHandle.write(contentsOf: chunkData)
+                    bytesCopied += Double(chunkData.count)
                     if totalSize > 0 {
                         onProgress?(bytesCopied / totalSize)
                     }
