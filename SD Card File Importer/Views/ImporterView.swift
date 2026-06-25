@@ -22,29 +22,37 @@ struct ImporterView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         appHeader
                         
-                        HStack(alignment: .top, spacing: 16) {
+                        HStack(spacing: 16) {
                             DestinationCard(vm: vm)
+                                .frame(maxHeight: .infinity)
                             SDCardsSection(vm: vm)
+                                .frame(maxHeight: .infinity)
                         }
+                        .fixedSize(horizontal: false, vertical: true)
                         
-                        HStack(alignment: .top, spacing: 16) {
+                        HStack(spacing: 16) {
                             OptionsCard(options: $vm.options)
+                                .frame(maxHeight: .infinity)
                             actionCard
+                                .frame(maxHeight: .infinity)
                         }
-                        
-                        FileListSection(vm: vm)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(16)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.65)
+                    .minimumScaleFactor(0.85)
                 }
                 .frame(minWidth: 450)
                 .layoutPriority(1)
                 
+                // Middle Column: Found Files
+                FileListSection(vm: vm)
+                    .padding(16)
+                    .frame(minWidth: 250)
+                
                 // Right Column: Activity Log
                 ActivityLogSection(vm: vm)
                     .padding(16)
-                    .frame(minWidth: 300)
+                    .frame(minWidth: 250)
             }
         }
         .frame(minWidth: 1000, minHeight: 650)
@@ -90,6 +98,7 @@ struct ImporterView: View {
                 } label: {
                     Label("Scan SD Cards", systemImage: "magnifyingglass.circle.fill")
                         .frame(maxWidth: .infinity)
+                        .lineLimit(1)
                 }
                 .buttonStyle(SecondaryButtonStyle())
                 
@@ -100,6 +109,7 @@ struct ImporterView: View {
                 } label: {
                     Label("Start Import", systemImage: "square.and.arrow.down.fill")
                         .frame(maxWidth: .infinity)
+                        .lineLimit(1)
                 }
                 .buttonStyle(PremiumButtonStyle(color: .successGreen))
                 .disabled(vm.destinationURL == nil || vm.isImporting)

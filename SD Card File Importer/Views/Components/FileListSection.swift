@@ -66,7 +66,7 @@ struct FileListSection: View {
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.vertical, 12)
     }
     
@@ -78,7 +78,7 @@ struct FileListSection: View {
                 }
             }
         }
-        .frame(maxHeight: 200)
+        .frame(maxHeight: .infinity)
         .quickLookPreview($previewURL)
     }
 }

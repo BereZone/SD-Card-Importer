@@ -26,8 +26,9 @@ struct OptionsCard: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(width: 140)
+                    .frame(maxWidth: 140)
                 }
+                .lineLimit(1)
                 
                 Divider()
                 
@@ -46,6 +47,7 @@ struct OptionsCard: View {
                 }
                 .toggleStyle(.switch)
                 .tint(.accentPrimary)
+                .lineLimit(1)
                 
                 Divider()
                 
@@ -64,6 +66,7 @@ struct OptionsCard: View {
                 }
                 .toggleStyle(.switch)
                 .tint(.warningOrange)
+                .lineLimit(1)
                 
                 Divider()
                 
@@ -82,7 +85,10 @@ struct OptionsCard: View {
                 }
                 .toggleStyle(.switch)
                 .tint(.successGreen)
+                .lineLimit(1)
             }
+            
+            Spacer(minLength: 0)
         }
         .modernCard(accentColor: .accentPrimary)
     }

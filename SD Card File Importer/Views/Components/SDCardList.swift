@@ -14,14 +14,22 @@ struct SDCardsSection: View {
                         vm.clearIgnoresAndRefresh()
                     }
                 } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Refresh")
+                            .lineLimit(1)
+                    }
                 }
                 .buttonStyle(SecondaryButtonStyle())
                 
                 Button {
                     Task { await vm.addSourceVolume() }
                 } label: {
-                    Label("Add SD Card", systemImage: "plus.circle.fill")
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add")
+                            .lineLimit(1)
+                    }
                 }
                 .buttonStyle(SecondaryButtonStyle())
                 
@@ -31,6 +39,7 @@ struct SDCardsSection: View {
                     HStack(spacing: 4) {
                         Image(systemName: "ladybug.fill")
                         Text("Debug")
+                            .lineLimit(1)
                     }
                     .font(.system(.caption, design: .rounded).weight(.medium))
                 }
@@ -43,6 +52,8 @@ struct SDCardsSection: View {
             } else {
                 list
             }
+            
+            Spacer(minLength: 0)
         }
         .modernCard(accentColor: .accentSecondary)
     }
@@ -71,10 +82,12 @@ struct SDCardsSection: View {
             Text("No SD cards detected")
                 .font(.system(.subheadline, design: .rounded).weight(.medium))
                 .foregroundColor(.secondary)
+                .lineLimit(1)
             Text("Insert an SD card or click 'Add SD Card'")
                 .font(.caption2)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+                .lineLimit(1)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
@@ -115,6 +128,7 @@ struct SDCardsSection: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(url.lastPathComponent)
                         .font(.system(.headline, design: .rounded).weight(.semibold))
+                        .lineLimit(1)
                     Text(url.path)
                         .font(.system(.caption, design: .monospaced))
                         .foregroundColor(.secondary)
@@ -185,7 +199,7 @@ struct SDCardsSection: View {
             }
         }
         .labelsHidden()
-        .frame(width: 160)
+        .frame(maxWidth: 160)
         .tint(.accentPrimary)
     }
     

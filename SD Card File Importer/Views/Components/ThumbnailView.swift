@@ -7,7 +7,6 @@ struct ThumbnailView: View {
     
     @State private var image: NSImage?
     @State private var failed: Bool = false
-    @State private var isExpanded: Bool = false
     
     var body: some View {
         Group {
@@ -19,10 +18,6 @@ struct ThumbnailView: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: size, height: size)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
-                    .onTapGesture { isExpanded = true }
-                    .popover(isPresented: $isExpanded) {
-                        expandedView
-                    }
             } else if failed {
                 fallbackIcon
             } else {
@@ -38,20 +33,7 @@ struct ThumbnailView: View {
         }
     }
     
-    private var expandedView: some View {
-        VStack {
-            if let image = image {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: 400, maxHeight: 400)
-            }
-            Text(url.lastPathComponent)
-                .font(.caption)
-                .padding(.top, 4)
-        }
-        .padding()
-    }
+
     
     private var fallbackIcon: some View {
         let isVideo = ["mp4", "mov", "mxf", "mts", "m4v"].contains(url.pathExtension.lowercased())

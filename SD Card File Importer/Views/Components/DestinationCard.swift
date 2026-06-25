@@ -24,6 +24,7 @@ struct DestinationCard: View {
                     if let dest = vm.destinationURL {
                         Text(dest.lastPathComponent)
                             .font(.system(.headline, design: .rounded).weight(.semibold))
+                            .lineLimit(1)
                         Text(dest.path(percentEncoded: false))
                             .font(.system(.caption, design: .monospaced))
                             .foregroundColor(.secondary)
@@ -32,9 +33,11 @@ struct DestinationCard: View {
                         Text("No destination selected")
                             .font(.system(.headline, design: .rounded).weight(.semibold))
                             .foregroundColor(.secondary)
+                            .lineLimit(1)
                         Text("Choose a folder to import files")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                            .lineLimit(1)
                     }
                 }
                 
@@ -43,10 +46,16 @@ struct DestinationCard: View {
                 Button {
                     vm.pickDestination()
                 } label: {
-                    Label("Choose", systemImage: "folder.badge.plus")
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.badge.plus")
+                        Text("Choose")
+                            .lineLimit(1)
+                    }
                 }
                 .buttonStyle(SecondaryButtonStyle())
             }
+            
+            Spacer(minLength: 0)
         }
         .modernCard(accentColor: .accentPrimary)
     }
