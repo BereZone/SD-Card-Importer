@@ -63,7 +63,7 @@ struct SDCardsSection: View {
             Image(systemName: "externaldrive.fill.badge.checkmark")
                 .font(.title2)
                 .foregroundColor(.accentSecondary)
-            Text("Detected SD Cards")
+            Text("SD Cards")
                 .sectionHeader()
             Spacer()
             
