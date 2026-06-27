@@ -94,9 +94,9 @@ struct OptionsCard: View {
                         Image(systemName: "macwindow")
                             .foregroundColor(options.openDestinationWhenDone ? .accentPrimary : .secondary)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Open When Done")
+                            Text("Open After Import")
                                 .font(.system(.body, design: .rounded).weight(.medium))
-                            Text("Reveal destination in Finder")
+                            Text("Reveal in Destination Folder")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
