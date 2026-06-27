@@ -11,5 +11,6 @@ struct ImportOptions {
     var dryRun: Bool = true
     var moveInsteadOfCopy: Bool = false
     var ejectAfterImport: Bool = false
+    var openDestinationWhenDone: Bool = true
     var organizationMode: OrganizationMode = .cameraFirst
 }

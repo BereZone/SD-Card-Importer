@@ -86,6 +86,25 @@ struct OptionsCard: View {
                 .toggleStyle(.switch)
                 .tint(.successGreen)
                 .lineLimit(1)
+                
+                Divider()
+                
+                Toggle(isOn: $options.openDestinationWhenDone) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "macwindow")
+                            .foregroundColor(options.openDestinationWhenDone ? .accentPrimary : .secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Open When Done")
+                                .font(.system(.body, design: .rounded).weight(.medium))
+                            Text("Reveal destination in Finder")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(.accentPrimary)
+                .lineLimit(1)
             }
             
             Spacer(minLength: 0)

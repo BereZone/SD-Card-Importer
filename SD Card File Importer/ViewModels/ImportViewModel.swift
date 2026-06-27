@@ -259,6 +259,11 @@ final class ImportViewModel: ObservableObject {
                     self.log("🔌 Ejected: \(vol.lastPathComponent)")
                 }
             }
+            
+            if options.openDestinationWhenDone && !options.dryRun && !Task.isCancelled {
+                NSWorkspace.shared.open(destRoot)
+                self.log("📂 Opened destination in Finder.")
+            }
         }
         
         await importTask?.value
