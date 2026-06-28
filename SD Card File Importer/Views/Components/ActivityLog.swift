@@ -14,6 +14,8 @@ struct ActivityLogSection: View {
                     .foregroundColor(.accentPrimary)
                 Text("Activity Log")
                     .sectionHeader()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Spacer()
                 if !vm.logLines.isEmpty {
                     StatusBadge(

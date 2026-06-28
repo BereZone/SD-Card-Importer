@@ -13,6 +13,8 @@ struct FileListSection: View {
                     .foregroundColor(.accentSecondary)
                 Text("Found Files")
                     .sectionHeader()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
                 Button(action: { vm.showPreviews.toggle() }) {
                     Image(systemName: vm.showPreviews ? "eye.fill" : "eye.slash.fill")
