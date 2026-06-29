@@ -29,6 +29,25 @@ struct OptionsCard: View {
                     .frame(maxWidth: 140)
                 }
                 .lineLimit(1)
+                .lineLimit(1)
+                
+                Divider()
+                
+                HStack {
+                    Image(systemName: "calendar")
+                        .foregroundColor(.accentSecondary)
+                    Text("Date Filter")
+                        .font(.system(.body, design: .rounded).weight(.medium))
+                    Spacer()
+                    Picker("", selection: $options.dateFilter) {
+                        ForEach(ImportOptions.DateFilter.allCases) { filter in
+                            Text(filter.rawValue).tag(filter)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 140)
+                }
+                .lineLimit(1)
                 
                 Divider()
                 

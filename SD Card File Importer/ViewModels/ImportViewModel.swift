@@ -39,6 +39,8 @@ final class ImportViewModel: ObservableObject {
 
     // Destination
     @AppStorage("destBookmarkData") var destBookmarkData: Data?
+    @AppStorage("lastImportDate") var lastImportDate: Double = 0
+    
     @Published var destinationURL: URL? = nil {
         didSet {
             if destinationURL != nil {
@@ -184,9 +186,28 @@ final class ImportViewModel: ObservableObject {
                 return results
             }.value
             
-            self.candidates = foundCandidates
+            let filter = self.options.dateFilter
+            let lastImport = self.lastImportDate
+            
+            let filteredCandidates = foundCandidates.filter { candidate in
+                switch filter {
+                case .all:
+                    return true
+                case .sinceLastImport:
+                    return candidate.date.timeIntervalSince1970 > lastImport
+                case .today:
+                    return Calendar.current.isDateInToday(candidate.date)
+                case .last7Days:
+                    if let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) {
+                        return candidate.date > sevenDaysAgo
+                    }
+                    return true
+                }
+            }
+            
+            self.candidates = filteredCandidates
             self.progress = 1.0
-            self.log("Found \(foundCandidates.count) files.")
+            self.log("Found \(filteredCandidates.count) files (filtered from \(foundCandidates.count)).")
         }
     }
     
@@ -252,6 +273,10 @@ final class ImportViewModel: ObservableObject {
 
             self.progress = 1.0
             self.log("Done. Imported \(importedCount)/\(candidates.count).")
+            
+            if importedCount > 0 && !options.dryRun {
+                self.lastImportDate = Date().timeIntervalSince1970
+            }
 
             if options.ejectAfterImport && !options.dryRun && !Task.isCancelled {
                 for vol in removableVolumes {
