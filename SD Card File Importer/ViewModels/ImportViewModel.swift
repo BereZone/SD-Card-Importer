@@ -202,6 +202,11 @@ final class ImportViewModel: ObservableObject {
                         return candidate.date > sevenDaysAgo
                     }
                     return true
+                case .customRange:
+                    // Normalize dates to start of day for start date, and end of day for end date for inclusivity
+                    let start = Calendar.current.startOfDay(for: self.options.customStartDate)
+                    let end = Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: self.options.customEndDate) ?? self.options.customEndDate
+                    return candidate.date >= start && candidate.date <= end
                 }
             }
             

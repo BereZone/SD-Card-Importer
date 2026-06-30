@@ -13,6 +13,7 @@ struct ImportOptions {
         case sinceLastImport = "Since Last Import"
         case today = "Today"
         case last7Days = "Last 7 Days"
+        case customRange = "Custom Range"
         
         var id: String { rawValue }
     }
@@ -25,4 +26,6 @@ struct ImportOptions {
     var dateFilter: DateFilter = .all
     var renameFiles: Bool = false
     var renameTemplate: String = "{YYYY}-{MM}-{DD}_{Camera}_{OriginalName}"
+    var customStartDate: Date = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+    var customEndDate: Date = Date()
 }

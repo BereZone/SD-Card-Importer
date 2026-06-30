@@ -49,6 +49,20 @@ struct OptionsCard: View {
                 }
                 .lineLimit(1)
                 
+                if options.dateFilter == .customRange {
+                    HStack(spacing: 4) {
+                        DatePicker("", selection: $options.customStartDate, displayedComponents: .date)
+                            .labelsHidden()
+                        Text("to")
+                            .foregroundColor(.secondary)
+                            .font(.system(.body, design: .rounded))
+                        DatePicker("", selection: $options.customEndDate, displayedComponents: .date)
+                            .labelsHidden()
+                    }
+                    .padding(.leading, 32)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+                
                 Divider()
                 
                 Toggle(isOn: $options.renameFiles.animation()) {
