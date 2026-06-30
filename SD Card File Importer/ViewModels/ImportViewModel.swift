@@ -227,6 +227,8 @@ final class ImportViewModel: ObservableObject {
         
         let total = max(candidates.count, 1)
         var importedCount = 0
+        var importedPhotoPaths: [URL] = []
+        var importedVideoPaths: [URL] = []
         
         importTask = Task { @MainActor in
             for (idx, c) in candidates.enumerated() {
@@ -266,6 +268,13 @@ final class ImportViewModel: ObservableObject {
                     }.value
                     self.log("✅ Imported: \(destURL.lastPathComponent)")
                     importedCount += 1
+                    
+                    let ext = destURL.pathExtension.lowercased()
+                    if ["mp4", "mov", "mxf", "mts", "m4v"].contains(ext) {
+                        importedVideoPaths.append(destURL)
+                    } else {
+                        importedPhotoPaths.append(destURL)
+                    }
                 } catch is CancellationError {
                     self.log("⚠️ Import cancelled by user.")
                     break
@@ -291,12 +300,56 @@ final class ImportViewModel: ObservableObject {
             }
             
             if options.openDestinationWhenDone && !options.dryRun && !Task.isCancelled {
-                NSWorkspace.shared.open(destRoot)
-                self.log("📂 Opened destination in Finder.")
+                var dirsToOpen = Set<URL>()
+                
+                if let pd = self.deepestCommonFolder(for: importedPhotoPaths) {
+                    dirsToOpen.insert(pd)
+                }
+                
+                if let vd = self.deepestCommonFolder(for: importedVideoPaths) {
+                    dirsToOpen.insert(vd)
+                }
+                
+                if dirsToOpen.isEmpty {
+                    dirsToOpen.insert(destRoot)
+                }
+                
+                for dir in dirsToOpen {
+                    NSWorkspace.shared.open(dir)
+                    self.log("📂 Opened destination: \(dir.lastPathComponent)")
+                }
             }
         }
         
         await importTask?.value
+    }
+    
+    private func deepestCommonFolder(for urls: [URL]) -> URL? {
+        guard let first = urls.first else { return nil }
+        var common = first.deletingLastPathComponent().pathComponents
+        
+        for url in urls.dropFirst() {
+            let dir = url.deletingLastPathComponent().pathComponents
+            let minLen = min(common.count, dir.count)
+            var newCommon: [String] = []
+            for i in 0..<minLen {
+                if common[i] == dir[i] {
+                    newCommon.append(common[i])
+                } else {
+                    break
+                }
+            }
+            common = newCommon
+            if common.isEmpty { break }
+        }
+        
+        guard !common.isEmpty else { return nil }
+        
+        var result = URL(fileURLWithPath: "/")
+        for comp in common where comp != "/" {
+            result.append(path: comp)
+        }
+        return result
     }
     
     func cancelImport() {
