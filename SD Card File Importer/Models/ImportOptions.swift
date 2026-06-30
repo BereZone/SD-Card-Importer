@@ -23,4 +23,6 @@ struct ImportOptions {
     var openDestinationWhenDone: Bool = true
     var organizationMode: OrganizationMode = .cameraFirst
     var dateFilter: DateFilter = .all
+    var renameFiles: Bool = false
+    var renameTemplate: String = "{YYYY}-{MM}-{DD}_{Camera}_{OriginalName}"
 }

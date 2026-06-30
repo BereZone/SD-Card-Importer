@@ -393,7 +393,35 @@ final class ImportViewModel: ObservableObject {
                 url.append(path: seg)
             }
         }
-        return url.appending(path: c.url.lastPathComponent)
+        
+        let fileName = options.renameFiles ? generateFilename(for: c, template: options.renameTemplate) : c.url.lastPathComponent
+        return url.appending(path: fileName)
+    }
+    
+    private func generateFilename(for c: ImportCandidate, template: String) -> String {
+        let cal = Calendar(identifier: .gregorian)
+        let y  = String(format: "%04d", cal.component(.year, from: c.date))
+        let m  = String(format: "%02d", cal.component(.month, from: c.date))
+        let d  = String(format: "%02d", cal.component(.day, from: c.date))
+        
+        let camera = cameraBucket(for: c)
+        let originalName = c.url.deletingPathExtension().lastPathComponent
+        let originalExt = c.url.pathExtension
+        
+        var result = template
+        result = result.replacingOccurrences(of: "{YYYY}", with: y)
+        result = result.replacingOccurrences(of: "{MM}", with: m)
+        result = result.replacingOccurrences(of: "{DD}", with: d)
+        result = result.replacingOccurrences(of: "{Camera}", with: camera)
+        result = result.replacingOccurrences(of: "{OriginalName}", with: originalName)
+        result = result.replacingOccurrences(of: "{OriginalExtension}", with: originalExt)
+        
+        // Only append extension if they didn't explicitly include {OriginalExtension}
+        if !template.contains("{OriginalExtension}") && !originalExt.isEmpty {
+            result += ".\(originalExt)"
+        }
+        
+        return result
     }
     
     // MARK: - Destination Logic
