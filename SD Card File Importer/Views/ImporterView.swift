@@ -122,6 +122,11 @@ struct ImporterView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Spacer()
+                            if !vm.currentTransferSpeed.isEmpty {
+                                Text("\(vm.currentTransferSpeed) • \(vm.estimatedTimeRemaining)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                             Text("\(Int(vm.progress * 100))%")
                                 .font(.caption.weight(.bold))
                                 .foregroundColor(.accentPrimary)

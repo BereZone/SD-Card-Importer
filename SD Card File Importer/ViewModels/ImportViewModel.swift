@@ -19,6 +19,8 @@ final class ImportViewModel: ObservableObject {
     @Published var logLines: [String] = []
     @Published var isImporting: Bool = false
     @Published var progress: Double = 0
+    @Published var currentTransferSpeed: String = ""
+    @Published var estimatedTimeRemaining: String = ""
     @Published var debugScan: Bool = false
     
     // User Settings
@@ -230,6 +232,13 @@ final class ImportViewModel: ObservableObject {
         var importedPhotoPaths: [URL] = []
         var importedVideoPaths: [URL] = []
         
+        let totalBytes = candidates.filter { !disabledCandidates.contains($0.id) }.reduce(0) { $0 + $1.fileSize }
+        var completedBytes: UInt64 = 0
+        let startTime = Date()
+        
+        self.currentTransferSpeed = ""
+        self.estimatedTimeRemaining = ""
+        
         importTask = Task { @MainActor in
             for (idx, c) in candidates.enumerated() {
                 if Task.isCancelled {
@@ -262,12 +271,34 @@ final class ImportViewModel: ObservableObject {
                     try await Task.detached(priority: .userInitiated) {
                         try await currentImporter.performImport(candidate: c, destination: destURL, options: currentOptions) { byteProgress in
                             Task { @MainActor in
-                                self.progress = (Double(idx) + byteProgress) / Double(total)
+                                let currentFileBytes = Double(c.fileSize) * byteProgress
+                                let totalCopied = Double(completedBytes) + currentFileBytes
+                                
+                                if totalBytes > 0 {
+                                    self.progress = totalCopied / Double(totalBytes)
+                                } else {
+                                    self.progress = (Double(idx) + byteProgress) / Double(total)
+                                }
+                                
+                                let elapsed = Date().timeIntervalSince(startTime)
+                                if elapsed > 1.0 && totalBytes > 0 {
+                                    let bytesPerSec = totalCopied / elapsed
+                                    self.currentTransferSpeed = self.formatBytes(bytesPerSec) + "/s"
+                                    
+                                    let remainingBytes = Double(totalBytes) - totalCopied
+                                    if remainingBytes > 0 {
+                                        let secondsRemaining = remainingBytes / bytesPerSec
+                                        self.estimatedTimeRemaining = self.formatTime(secondsRemaining)
+                                    } else {
+                                        self.estimatedTimeRemaining = "Finishing..."
+                                    }
+                                }
                             }
                         }
                     }.value
                     self.log("✅ Imported: \(destURL.lastPathComponent)")
                     importedCount += 1
+                    completedBytes += c.fileSize
                     
                     let ext = destURL.pathExtension.lowercased()
                     if ["mp4", "mov", "mxf", "mts", "m4v"].contains(ext) {
@@ -286,6 +317,8 @@ final class ImportViewModel: ObservableObject {
             }
 
             self.progress = 1.0
+            self.currentTransferSpeed = ""
+            self.estimatedTimeRemaining = ""
             self.log("Done. Imported \(importedCount)/\(candidates.count).")
             
             if importedCount > 0 && !options.dryRun {
@@ -356,6 +389,23 @@ final class ImportViewModel: ObservableObject {
         importTask?.cancel()
     }
     
+    // MARK: - Formatting Helpers
+    
+    private func formatBytes(_ bytes: Double) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(bytes))
+    }
+    
+    private func formatTime(_ seconds: Double) -> String {
+        guard seconds > 0 && seconds.isFinite else { return "Estimating..." }
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.unitsStyle = .abbreviated
+        return formatter.string(from: seconds) ?? "Unknown"
+    }
+
     // MARK: - Selection
     
     func toggleSelection(for candidate: ImportCandidate) {
