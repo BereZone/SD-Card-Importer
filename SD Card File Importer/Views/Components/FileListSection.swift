@@ -4,6 +4,7 @@ import QuickLook
 struct FileListSection: View {
     @ObservedObject var vm: ImportViewModel
     @State private var previewURL: URL?
+    @AppStorage("uiDensity") private var uiDensity: UIDensity = .comfortable
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -74,7 +75,7 @@ struct FileListSection: View {
     
     private var filesList: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 6) {
+            LazyVStack(alignment: .leading, spacing: uiDensity == .compact ? 2 : 6) {
                 ForEach(vm.candidates) { c in
                     FileRow(candidate: c, vm: vm, previewURL: $previewURL)
                 }
@@ -89,11 +90,12 @@ struct FileRow: View {
     let candidate: ImportCandidate
     @ObservedObject var vm: ImportViewModel
     @Binding var previewURL: URL?
+    @AppStorage("uiDensity") private var uiDensity: UIDensity = .comfortable
     
     var body: some View {
         let ext = candidate.url.pathExtension.lowercased()
         
-        return HStack(spacing: 10) {
+        return HStack(spacing: uiDensity == .compact ? 6 : 10) {
             Toggle("", isOn: Binding(
                 get: { !vm.disabledCandidates.contains(candidate.id) },
                 set: { _ in vm.toggleSelection(for: candidate) }
@@ -102,15 +104,15 @@ struct FileRow: View {
             .labelsHidden()
             
             
-            HStack(spacing: 10) {
-                ThumbnailView(url: candidate.url, size: 32, show: vm.showPreviews)
+            HStack(spacing: uiDensity == .compact ? 6 : 10) {
+                ThumbnailView(url: candidate.url, size: uiDensity == .compact ? 24 : 32, show: vm.showPreviews)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(candidate.url.lastPathComponent)
-                        .font(.system(.body, design: .rounded))
+                        .font(.system(uiDensity == .compact ? .caption : .body, design: .rounded))
                         .lineLimit(1)
                     Text(byteCount(candidate.fileSize))
-                        .font(.system(.caption, design: .monospaced))
+                        .font(.system(uiDensity == .compact ? .caption2 : .caption, design: .monospaced))
                         .foregroundColor(.secondary)
                 }
                 
@@ -131,8 +133,8 @@ struct FileRow: View {
                 previewURL = candidate.url
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.horizontal, uiDensity == .compact ? 4 : 8)
+        .padding(.vertical, uiDensity == .compact ? 2 : 6)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.cardBackgroundSecondary)
