@@ -27,7 +27,6 @@ final class ImportViewModel: ObservableObject {
     @Published var options = ImportOptions()
     @Published var sessionIgnoredPaths = Set<String>()
     @Published var disabledCandidates = Set<UUID>()
-    @Published var showPreviews: Bool = true
     
     var selectedCandidatesCount: Int {
         candidates.filter { !disabledCandidates.contains($0.id) }.count

@@ -3,6 +3,7 @@ import SwiftUI
 struct AppearanceView: View {
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
     @AppStorage("uiDensity") private var uiDensity: UIDensity = .comfortable
+    @AppStorage("showPreviews") private var showPreviews: Bool = true
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -51,6 +52,15 @@ struct AppearanceView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 300)
+                
+                Divider()
+                    .padding(.vertical, 8)
+                
+                Text("Content")
+                    .sectionHeader()
+                
+                Toggle("Show File Previews (Thumbnails)", isOn: $showPreviews)
+                    .toggleStyle(.switch)
             }
             .modernCard(accentColor: .accentPrimary)
             

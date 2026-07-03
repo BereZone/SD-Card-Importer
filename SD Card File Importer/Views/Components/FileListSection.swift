@@ -5,6 +5,7 @@ struct FileListSection: View {
     @ObservedObject var vm: ImportViewModel
     @State private var previewURL: URL?
     @AppStorage("uiDensity") private var uiDensity: UIDensity = .comfortable
+    @AppStorage("showPreviews") private var showPreviews: Bool = true
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -16,14 +17,6 @@ struct FileListSection: View {
                     .sectionHeader()
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                
-                Button(action: { vm.showPreviews.toggle() }) {
-                    Image(systemName: vm.showPreviews ? "eye.fill" : "eye.slash.fill")
-                        .foregroundColor(.secondary)
-                        .font(.caption)
-                }
-                .buttonStyle(.plain)
-                .help("Toggle Previews")
                 
                 Spacer()
                 
@@ -91,6 +84,7 @@ struct FileRow: View {
     @ObservedObject var vm: ImportViewModel
     @Binding var previewURL: URL?
     @AppStorage("uiDensity") private var uiDensity: UIDensity = .comfortable
+    @AppStorage("showPreviews") private var showPreviews: Bool = true
     
     var body: some View {
         let ext = candidate.url.pathExtension.lowercased()
@@ -105,7 +99,7 @@ struct FileRow: View {
             
             
             HStack(spacing: uiDensity == .compact ? 6 : 10) {
-                ThumbnailView(url: candidate.url, size: uiDensity == .compact ? 24 : 32, show: vm.showPreviews)
+                ThumbnailView(url: candidate.url, size: uiDensity == .compact ? 24 : 32, show: showPreviews)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(candidate.url.lastPathComponent)
