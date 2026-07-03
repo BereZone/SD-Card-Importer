@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AppearanceView: View {
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
-    @AppStorage("uiDensity") private var uiDensity: UIDensity = .comfortable
+    @AppStorage("uiThumbnailSize") private var uiThumbnailSize: Double = 32.0
     @AppStorage("showPreviews") private var showPreviews: Bool = true
     @AppStorage("windowTranslucency") private var windowTranslucency: Bool = true
     
@@ -46,13 +46,21 @@ struct AppearanceView: View {
                 Text("UI Density")
                     .sectionHeader()
                 
-                Picker("Density", selection: $uiDensity) {
-                    ForEach(UIDensity.allCases) { density in
-                        Text(density.rawValue).tag(density)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Thumbnail Size: \(Int(uiThumbnailSize))px")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Slider(value: $uiThumbnailSize, in: 20...32, step: 4)
+                        .frame(maxWidth: 300)
+                    
+                    HStack {
+                        Text("Compact").font(.caption2).foregroundColor(.secondary)
+                        Spacer()
+                        Text("Comfortable").font(.caption2).foregroundColor(.secondary)
                     }
+                    .frame(maxWidth: 300)
                 }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 300)
                 
                 Divider()
                     .padding(.vertical, 8)

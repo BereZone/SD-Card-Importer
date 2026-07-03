@@ -2,7 +2,7 @@ import SwiftUI
 
 struct OptionsCard: View {
     @Binding var options: ImportOptions
-    @AppStorage("uiDensity") private var uiDensity: UIDensity = .comfortable
+    @AppStorage("uiThumbnailSize") private var uiThumbnailSize: Double = 32.0
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -14,7 +14,7 @@ struct OptionsCard: View {
                     .sectionHeader()
             }
             
-            VStack(alignment: .leading, spacing: uiDensity == .compact ? 6 : 10) {
+            VStack(alignment: .leading, spacing: CGFloat(10 - (32 - uiThumbnailSize)/3)) {
                 HStack {
                     Image(systemName: "folder.fill")
                         .foregroundColor(.accentSecondary)

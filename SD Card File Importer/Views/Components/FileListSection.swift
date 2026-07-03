@@ -4,7 +4,7 @@ import QuickLook
 struct FileListSection: View {
     @ObservedObject var vm: ImportViewModel
     @State private var previewURL: URL?
-    @AppStorage("uiDensity") private var uiDensity: UIDensity = .comfortable
+    @AppStorage("uiThumbnailSize") private var uiThumbnailSize: Double = 32.0
     @AppStorage("showPreviews") private var showPreviews: Bool = true
     
     var body: some View {
@@ -68,7 +68,7 @@ struct FileListSection: View {
     
     private var filesList: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: uiDensity == .compact ? 2 : 6) {
+            LazyVStack(alignment: .leading, spacing: CGFloat(10 - (32 - uiThumbnailSize)/3)) {
                 ForEach(vm.candidates) { c in
                     FileRow(candidate: c, vm: vm, previewURL: $previewURL)
                 }
@@ -83,13 +83,13 @@ struct FileRow: View {
     let candidate: ImportCandidate
     @ObservedObject var vm: ImportViewModel
     @Binding var previewURL: URL?
-    @AppStorage("uiDensity") private var uiDensity: UIDensity = .comfortable
+    @AppStorage("uiThumbnailSize") private var uiThumbnailSize: Double = 32.0
     @AppStorage("showPreviews") private var showPreviews: Bool = true
     
     var body: some View {
         let ext = candidate.url.pathExtension.lowercased()
         
-        return HStack(spacing: uiDensity == .compact ? 6 : 10) {
+        return HStack(spacing: CGFloat(10 - (32 - uiThumbnailSize)/3)) {
             Toggle("", isOn: Binding(
                 get: { !vm.disabledCandidates.contains(candidate.id) },
                 set: { _ in vm.toggleSelection(for: candidate) }
@@ -98,15 +98,15 @@ struct FileRow: View {
             .labelsHidden()
             
             
-            HStack(spacing: uiDensity == .compact ? 6 : 10) {
-                ThumbnailView(url: candidate.url, size: uiDensity == .compact ? 24 : 32, show: showPreviews)
+            HStack(spacing: CGFloat(10 - (32 - uiThumbnailSize)/3)) {
+                ThumbnailView(url: candidate.url, size: CGFloat(uiThumbnailSize), show: showPreviews)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(candidate.url.lastPathComponent)
-                        .font(.system(uiDensity == .compact ? .caption : .body, design: .rounded))
+                        .font(.system(uiThumbnailSize < 28 ? .caption : .body, design: .rounded))
                         .lineLimit(1)
                     Text(byteCount(candidate.fileSize))
-                        .font(.system(uiDensity == .compact ? .caption2 : .caption, design: .monospaced))
+                        .font(.system(uiThumbnailSize < 28 ? .caption2 : .caption, design: .monospaced))
                         .foregroundColor(.secondary)
                 }
                 
@@ -127,8 +127,8 @@ struct FileRow: View {
                 previewURL = candidate.url
             }
         }
-        .padding(.horizontal, uiDensity == .compact ? 4 : 8)
-        .padding(.vertical, uiDensity == .compact ? 2 : 6)
+        .padding(.horizontal, CGFloat(8 - (32 - uiThumbnailSize)/3))
+        .padding(.vertical, CGFloat(6 - (32 - uiThumbnailSize)/3))
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.cardBackgroundSecondary)

@@ -15,10 +15,3 @@ enum AppTheme: String, CaseIterable, Identifiable {
         }
     }
 }
-
-enum UIDensity: String, CaseIterable, Identifiable {
-    case comfortable = "Comfortable"
-    case compact = "Compact"
-    
-    var id: String { rawValue }
-}
