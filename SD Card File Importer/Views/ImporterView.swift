@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ImporterView: View {
-    @StateObject private var vm = ImportViewModel()
+    @ObservedObject var vm: ImportViewModel
     
     var body: some View {
         ZStack {

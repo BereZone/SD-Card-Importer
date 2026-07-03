@@ -6,6 +6,7 @@ enum SidebarTab: Hashable {
 }
 
 struct SidebarContentView: View {
+    @StateObject private var vm = ImportViewModel()
     @State private var selectedTab: SidebarTab? = .home
     @AppStorage("windowTranslucency") private var windowTranslucency: Bool = true
     
@@ -28,7 +29,7 @@ struct SidebarContentView: View {
             Group {
                 switch selectedTab {
             case .home:
-                ImporterView()
+                ImporterView(vm: vm)
             case .appearance:
                 AppearanceView()
             case .none:
