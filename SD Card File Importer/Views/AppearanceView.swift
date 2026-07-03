@@ -4,6 +4,7 @@ struct AppearanceView: View {
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
     @AppStorage("uiDensity") private var uiDensity: UIDensity = .comfortable
     @AppStorage("showPreviews") private var showPreviews: Bool = true
+    @AppStorage("windowTranslucency") private var windowTranslucency: Bool = true
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -56,10 +57,13 @@ struct AppearanceView: View {
                 Divider()
                     .padding(.vertical, 8)
                 
-                Text("Content")
+                Text("Content & Window")
                     .sectionHeader()
                 
                 Toggle("Show File Previews (Thumbnails)", isOn: $showPreviews)
+                    .toggleStyle(.switch)
+                    
+                Toggle("Window Translucency (Glass Effect)", isOn: $windowTranslucency)
                     .toggleStyle(.switch)
             }
             .modernCard(accentColor: .accentPrimary)

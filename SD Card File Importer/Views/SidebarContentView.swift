@@ -7,6 +7,7 @@ enum SidebarTab: Hashable {
 
 struct SidebarContentView: View {
     @State private var selectedTab: SidebarTab? = .home
+    @AppStorage("windowTranslucency") private var windowTranslucency: Bool = true
     
     var body: some View {
         NavigationSplitView {
@@ -21,8 +22,11 @@ struct SidebarContentView: View {
             }
             .navigationTitle("SD Importer")
             .listStyle(.sidebar)
+            .scrollContentBackground(windowTranslucency ? .automatic : .hidden)
+            .background(windowTranslucency ? Color.clear : Color(NSColor.controlBackgroundColor))
         } detail: {
-            switch selectedTab {
+            Group {
+                switch selectedTab {
             case .home:
                 ImporterView()
             case .appearance:
@@ -31,6 +35,9 @@ struct SidebarContentView: View {
                 Text("Select an item from the sidebar")
                     .foregroundColor(.secondary)
             }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(windowTranslucency ? Color.clear : Color(NSColor.windowBackgroundColor))
         }
     }
 }
