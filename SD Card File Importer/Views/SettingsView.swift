@@ -85,11 +85,36 @@ struct SettingsView: View {
                                     .stroke(Color.accentPrimary.opacity(0.3), lineWidth: 1)
                             )
                         
-                        Text("Tokens: {YYYY} {MM} {DD} {Camera} {OriginalName} {OriginalExtension}")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.8)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Insert Token:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            HStack(spacing: 8) {
+                                tokenButton("{YYYY}")
+                                tokenButton("{MM}")
+                                tokenButton("{DD}")
+                                tokenButton("{Camera}")
+                            }
+                            
+                            HStack(spacing: 8) {
+                                tokenButton("{OriginalName}")
+                                tokenButton("{OriginalExtension}")
+                                
+                                Button(action: {
+                                    vm.options.renameTemplate = ""
+                                }) {
+                                    Text("Clear")
+                                        .font(.caption)
+                                        .foregroundColor(.red)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.red.opacity(0.1))
+                                        .cornerRadius(6)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                     }
                     .padding(.leading, 32)
                     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -101,5 +126,20 @@ struct SettingsView: View {
         }
         .padding(24)
         .frame(minWidth: 400, minHeight: 400, alignment: .topLeading)
+    }
+    
+    private func tokenButton(_ token: String) -> some View {
+        Button(action: {
+            vm.options.renameTemplate += token
+        }) {
+            Text(token)
+                .font(.caption.monospaced())
+                .foregroundColor(.accentColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.accentColor.opacity(0.1))
+                .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
     }
 }
