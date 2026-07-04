@@ -47,6 +47,9 @@ struct SettingsView: View {
                 Text("Determines how imported files are grouped into folders at the destination.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    
+                FolderPreviewView(mode: vm.options.organizationMode)
+                    .padding(.top, 4)
             }
             .modernCard(accentColor: .accentPrimary)
             
@@ -141,5 +144,80 @@ struct SettingsView: View {
                 .cornerRadius(6)
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct FolderPreviewView: View {
+    let mode: ImportOptions.OrganizationMode
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "folder.fill")
+                    .foregroundColor(.accentSecondary)
+                    .font(.system(size: 12))
+                Text("Destination")
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                if mode == .cameraFirst {
+                    cameraFirstTree
+                } else {
+                    dateFirstTree
+                }
+            }
+            .padding(.leading, 12)
+            .padding(.top, 2)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentPrimary.opacity(0.05))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.accentPrimary.opacity(0.15), lineWidth: 1)
+        )
+    }
+    
+    private var cameraFirstTree: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            treeNode(icon: "folder.fill", text: "SONY_A7IV")
+            VStack(alignment: .leading, spacing: 4) {
+                treeNode(icon: "folder.fill", text: "2026-10-24")
+                VStack(alignment: .leading, spacing: 4) {
+                    treeNode(icon: "photo.fill", text: "A7IV_001.ARW")
+                    treeNode(icon: "video.fill", text: "A7IV_002.MP4")
+                }
+                .padding(.leading, 14)
+            }
+            .padding(.leading, 14)
+        }
+    }
+    
+    private var dateFirstTree: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            treeNode(icon: "folder.fill", text: "2026-10-24")
+            VStack(alignment: .leading, spacing: 4) {
+                treeNode(icon: "folder.fill", text: "SONY_A7IV")
+                VStack(alignment: .leading, spacing: 4) {
+                    treeNode(icon: "photo.fill", text: "A7IV_001.ARW")
+                    treeNode(icon: "video.fill", text: "A7IV_002.MP4")
+                }
+                .padding(.leading, 14)
+            }
+            .padding(.leading, 14)
+        }
+    }
+    
+    private func treeNode(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .foregroundColor(icon == "folder.fill" ? .accentSecondary : .secondary)
+                .font(.system(size: 11))
+            Text(text)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.primary)
+        }
     }
 }
