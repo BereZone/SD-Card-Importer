@@ -16,25 +16,6 @@ struct OptionsCard: View {
             
             VStack(alignment: .leading, spacing: CGFloat(10 - (32 - uiThumbnailSize)/3)) {
                 HStack {
-                    Image(systemName: "folder.fill")
-                        .foregroundColor(.accentSecondary)
-                    Text("Folder Structure")
-                        .font(.system(.body, design: .rounded).weight(.medium))
-                    Spacer()
-                    Picker("", selection: $options.organizationMode) {
-                        ForEach(ImportOptions.OrganizationMode.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(maxWidth: 140)
-                }
-                .lineLimit(1)
-                .lineLimit(1)
-                
-                Divider()
-                
-                HStack {
                     Image(systemName: "calendar")
                         .foregroundColor(.accentSecondary)
                     Text("Date Filter")

@@ -2,6 +2,7 @@ import SwiftUI
 
 enum SidebarTab: Hashable {
     case home
+    case settings
     case appearance
 }
 
@@ -17,6 +18,10 @@ struct SidebarContentView: View {
                     Label("Home", systemImage: "house.fill")
                 }
                 
+                NavigationLink(value: SidebarTab.settings) {
+                    Label("Settings", systemImage: "gearshape.fill")
+                }
+                
                 NavigationLink(value: SidebarTab.appearance) {
                     Label("Appearance", systemImage: "paintbrush.fill")
                 }
@@ -30,6 +35,8 @@ struct SidebarContentView: View {
                 switch selectedTab {
             case .home:
                 ImporterView(vm: vm)
+            case .settings:
+                SettingsView(vm: vm)
             case .appearance:
                 AppearanceView()
             case .none:
