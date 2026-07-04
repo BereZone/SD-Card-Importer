@@ -184,10 +184,18 @@ struct FolderPreviewView: View {
         VStack(alignment: .leading, spacing: 4) {
             treeNode(icon: "folder.fill", text: "SONY_A7IV")
             VStack(alignment: .leading, spacing: 4) {
-                treeNode(icon: "folder.fill", text: "2026-10-24")
+                treeNode(icon: "folder.fill", text: "2026")
                 VStack(alignment: .leading, spacing: 4) {
-                    treeNode(icon: "photo.fill", text: "A7IV_001.ARW")
-                    treeNode(icon: "video.fill", text: "A7IV_002.MP4")
+                    treeNode(icon: "folder.fill", text: "10_October")
+                    VStack(alignment: .leading, spacing: 4) {
+                        treeNode(icon: "folder.fill", text: "24")
+                        VStack(alignment: .leading, spacing: 4) {
+                            treeNode(icon: "photo.fill", text: "A7IV_001.ARW")
+                            treeNode(icon: "video.fill", text: "A7IV_002.MP4")
+                        }
+                        .padding(.leading, 14)
+                    }
+                    .padding(.leading, 14)
                 }
                 .padding(.leading, 14)
             }
@@ -197,12 +205,20 @@ struct FolderPreviewView: View {
     
     private var dateFirstTree: some View {
         VStack(alignment: .leading, spacing: 4) {
-            treeNode(icon: "folder.fill", text: "2026-10-24")
+            treeNode(icon: "folder.fill", text: "2026")
             VStack(alignment: .leading, spacing: 4) {
-                treeNode(icon: "folder.fill", text: "SONY_A7IV")
+                treeNode(icon: "folder.fill", text: "10_October")
                 VStack(alignment: .leading, spacing: 4) {
-                    treeNode(icon: "photo.fill", text: "A7IV_001.ARW")
-                    treeNode(icon: "video.fill", text: "A7IV_002.MP4")
+                    treeNode(icon: "folder.fill", text: "24")
+                    VStack(alignment: .leading, spacing: 4) {
+                        treeNode(icon: "folder.fill", text: "SONY_A7IV")
+                        VStack(alignment: .leading, spacing: 4) {
+                            treeNode(icon: "photo.fill", text: "A7IV_001.ARW")
+                            treeNode(icon: "video.fill", text: "A7IV_002.MP4")
+                        }
+                        .padding(.leading, 14)
+                    }
+                    .padding(.leading, 14)
                 }
                 .padding(.leading, 14)
             }
