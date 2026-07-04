@@ -45,49 +45,7 @@ struct OptionsCard: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
                 
-                Divider()
-                
-                Toggle(isOn: $options.renameFiles.animation()) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "character.cursor.ibeam")
-                            .foregroundColor(options.renameFiles ? .accentPrimary : .secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Rename Files")
-                                .font(.system(.body, design: .rounded).weight(.medium))
-                            Text("Apply custom naming template")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                .toggleStyle(.switch)
-                .tint(.accentPrimary)
-                .lineLimit(1)
-                
-                if options.renameFiles {
-                    VStack(alignment: .leading, spacing: 6) {
-                        TextField("Template", text: $options.renameTemplate)
-                            .textFieldStyle(.plain)
-                            .font(.system(.body, design: .monospaced))
-                            .padding(8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.accentPrimary.opacity(0.1))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.accentPrimary.opacity(0.3), lineWidth: 1)
-                            )
-                        
-                        Text("Tokens: {YYYY} {MM} {DD} {Camera} {OriginalName} {OriginalExtension}")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .padding(.leading, 32)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
+
                 
                 Divider()
                 
