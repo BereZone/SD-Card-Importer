@@ -1,8 +1,14 @@
 import SwiftUI
 
+enum MediaType {
+    case photos
+    case videos
+}
+
 struct SDCardsSection: View {
     @ObservedObject var vm: ImportViewModel
-    @State private var tempCustomBucketName: [String: String] = [:]
+    @State private var tempCustomPhotosName: [String: String] = [:]
+    @State private var tempCustomVideosName: [String: String] = [:]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -103,9 +109,14 @@ struct SDCardsSection: View {
     
     private func row(for url: URL) -> some View {
         let volumeKey = vm.getVolumeRootPath(for: url) ?? ""
-        let currentSavedBucket = vm.customBuckets[volumeKey] ?? "Auto-Detect"
-        let isCustomSaved = !predefinedBuckets.contains(currentSavedBucket) && currentSavedBucket != "Auto-Detect"
-        let isPickerCustom = (currentSavedBucket == "Custom..." || isCustomSaved)
+        
+        let currentPhotosBucket = vm.customBucketsPhotos[volumeKey] ?? "Auto-Detect"
+        let isPhotosCustomSaved = !predefinedBuckets.contains(currentPhotosBucket) && currentPhotosBucket != "Auto-Detect"
+        let isPhotosPickerCustom = (currentPhotosBucket == "Custom..." || isPhotosCustomSaved)
+        
+        let currentVideosBucket = vm.customBucketsVideos[volumeKey] ?? "Auto-Detect"
+        let isVideosCustomSaved = !predefinedBuckets.contains(currentVideosBucket) && currentVideosBucket != "Auto-Detect"
+        let isVideosPickerCustom = (currentVideosBucket == "Custom..." || isVideosCustomSaved)
         
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
@@ -137,8 +148,6 @@ struct SDCardsSection: View {
                 
                 Spacer()
                 
-                bucketPicker(for: url, volumeKey: volumeKey, currentBucket: currentSavedBucket, isCustomSaved: isCustomSaved)
-                
                 Button(role: .destructive) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         vm.removeVolumeFromList(for: url)
@@ -152,8 +161,35 @@ struct SDCardsSection: View {
                 .contentShape(Rectangle())
             }
             
-            if isPickerCustom {
-                customFolderInput(for: url, volumeKey: volumeKey, currentBucket: currentSavedBucket, isCustomSaved: isCustomSaved)
+            Divider()
+                .padding(.vertical, 2)
+                
+            HStack(spacing: 8) {
+                Text("Photos")
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .foregroundColor(.secondary)
+                    .frame(width: 50, alignment: .leading)
+                
+                bucketPicker(for: url, volumeKey: volumeKey, currentBucket: currentPhotosBucket, isCustomSaved: isPhotosCustomSaved, mediaType: .photos)
+                
+                if isPhotosPickerCustom {
+                    customFolderInput(for: url, volumeKey: volumeKey, currentBucket: currentPhotosBucket, isCustomSaved: isPhotosCustomSaved, mediaType: .photos)
+                }
+                Spacer()
+            }
+            
+            HStack(spacing: 8) {
+                Text("Videos")
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .foregroundColor(.secondary)
+                    .frame(width: 50, alignment: .leading)
+                
+                bucketPicker(for: url, volumeKey: volumeKey, currentBucket: currentVideosBucket, isCustomSaved: isVideosCustomSaved, mediaType: .videos)
+                
+                if isVideosPickerCustom {
+                    customFolderInput(for: url, volumeKey: volumeKey, currentBucket: currentVideosBucket, isCustomSaved: isVideosCustomSaved, mediaType: .videos)
+                }
+                Spacer()
             }
         }
         .padding(12)
@@ -167,13 +203,33 @@ struct SDCardsSection: View {
         )
     }
     
-    private func bucketPicker(for url: URL, volumeKey: String, currentBucket: String, isCustomSaved: Bool) -> some View {
+    private func getTempName(for mediaType: MediaType, key: String) -> String? {
+        return mediaType == .photos ? tempCustomPhotosName[key] : tempCustomVideosName[key]
+    }
+    
+    private func setTempName(for mediaType: MediaType, key: String, value: String?) {
+        if mediaType == .photos {
+            tempCustomPhotosName[key] = value
+        } else {
+            tempCustomVideosName[key] = value
+        }
+    }
+    
+    private func setVmBucket(for mediaType: MediaType, url: URL, bucket: String) {
+        if mediaType == .photos {
+            vm.setCustomPhotosBucket(for: url, bucket: bucket)
+        } else {
+            vm.setCustomVideosBucket(for: url, bucket: bucket)
+        }
+    }
+
+    private func bucketPicker(for url: URL, volumeKey: String, currentBucket: String, isCustomSaved: Bool, mediaType: MediaType) -> some View {
         Picker("Import Bucket", selection: Binding(
             get: {
                 if isCustomSaved {
-                    if self.tempCustomBucketName[volumeKey] == nil {
+                    if self.getTempName(for: mediaType, key: volumeKey) == nil {
                         DispatchQueue.main.async {
-                            self.tempCustomBucketName[volumeKey] = currentBucket
+                            self.setTempName(for: mediaType, key: volumeKey, value: currentBucket)
                         }
                     }
                     return "Custom..."
@@ -182,14 +238,14 @@ struct SDCardsSection: View {
             },
             set: { selectedBucket in
                 if selectedBucket != "Custom..." {
-                    vm.setCustomBucket(for: url, bucket: selectedBucket)
-                    self.tempCustomBucketName.removeValue(forKey: volumeKey)
+                    self.setVmBucket(for: mediaType, url: url, bucket: selectedBucket)
+                    self.setTempName(for: mediaType, key: volumeKey, value: nil)
                 } else {
-                    let initialName = self.tempCustomBucketName[volumeKey] ?? currentBucket
+                    let initialName = self.getTempName(for: mediaType, key: volumeKey) ?? currentBucket
                     let newCustomName = isCustomSaved ? initialName : "Custom Project"
-                    self.tempCustomBucketName[volumeKey] = newCustomName
+                    self.setTempName(for: mediaType, key: volumeKey, value: newCustomName)
                     if newCustomName == "Custom Project" {
-                        vm.setCustomBucket(for: url, bucket: newCustomName)
+                        self.setVmBucket(for: mediaType, url: url, bucket: newCustomName)
                     }
                 }
             }
@@ -203,7 +259,7 @@ struct SDCardsSection: View {
         .tint(.accentPrimary)
     }
     
-    private func customFolderInput(for url: URL, volumeKey: String, currentBucket: String, isCustomSaved: Bool) -> some View {
+    private func customFolderInput(for url: URL, volumeKey: String, currentBucket: String, isCustomSaved: Bool, mediaType: MediaType) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "folder.fill.badge.gearshape")
                 .foregroundColor(.accentPrimary)
@@ -211,10 +267,10 @@ struct SDCardsSection: View {
             
             TextField("Enter custom folder name", text: Binding(
                 get: {
-                    return self.tempCustomBucketName[volumeKey] ?? (isCustomSaved ? currentBucket : "Custom Project")
+                    return self.getTempName(for: mediaType, key: volumeKey) ?? (isCustomSaved ? currentBucket : "Custom Project")
                 },
                 set: { newValue in
-                    self.tempCustomBucketName[volumeKey] = newValue
+                    self.setTempName(for: mediaType, key: volumeKey, value: newValue)
                 }
             ))
             .textFieldStyle(.plain)
@@ -229,15 +285,14 @@ struct SDCardsSection: View {
                     .stroke(Color.accentPrimary.opacity(0.3), lineWidth: 1)
             )
             .onSubmit {
-                if let newBucket = self.tempCustomBucketName[volumeKey], !newBucket.isEmpty {
-                    vm.setCustomBucket(for: url, bucket: newBucket)
+                if let newBucket = self.getTempName(for: mediaType, key: volumeKey), !newBucket.isEmpty {
+                    self.setVmBucket(for: mediaType, url: url, bucket: newBucket)
                 } else {
-                    vm.setCustomBucket(for: url, bucket: "Custom Project")
-                    self.tempCustomBucketName[volumeKey] = "Custom Project"
+                    self.setVmBucket(for: mediaType, url: url, bucket: "Custom Project")
+                    self.setTempName(for: mediaType, key: volumeKey, value: "Custom Project")
                 }
             }
         }
-        .padding(.leading, 56)
         .transition(.scale.combined(with: .opacity))
     }
 }

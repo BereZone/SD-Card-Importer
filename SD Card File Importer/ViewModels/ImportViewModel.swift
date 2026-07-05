@@ -33,8 +33,10 @@ final class ImportViewModel: ObservableObject {
     }
     
     // Buckets
-    @AppStorage("customSourceBucketsJSON") var customSourceBucketsJSON: Data?
-    @Published var customBuckets: [String: String] = [:]
+    @AppStorage("customSourceBucketsPhotosJSON") var customSourceBucketsPhotosJSON: Data?
+    @AppStorage("customSourceBucketsVideosJSON") var customSourceBucketsVideosJSON: Data?
+    @Published var customBucketsPhotos: [String: String] = [:]
+    @Published var customBucketsVideos: [String: String] = [:]
     // Optional: map specific volume names to bucket names
     let volumeBucketOverride: [String: String] = [:]
 
@@ -433,37 +435,66 @@ final class ImportViewModel: ObservableObject {
         return "/\(components[1])/\(components[2])"
     }
 
-    func setCustomBucket(for url: URL, bucket: String) {
+    func setCustomPhotosBucket(for url: URL, bucket: String) {
         guard let path = getVolumeRootPath(for: url) else { return }
         if bucket == "Auto-Detect" || bucket == "Custom..." {
-            customBuckets.removeValue(forKey: path)
+            customBucketsPhotos.removeValue(forKey: path)
         } else {
-            customBuckets[path] = bucket
+            customBucketsPhotos[path] = bucket
         }
         saveCustomBuckets()
-        log("Set custom bucket for \(url.lastPathComponent) to '\(bucket)'")
+        log("Set custom photos bucket for \(url.lastPathComponent) to '\(bucket)'")
+    }
+
+    func setCustomVideosBucket(for url: URL, bucket: String) {
+        guard let path = getVolumeRootPath(for: url) else { return }
+        if bucket == "Auto-Detect" || bucket == "Custom..." {
+            customBucketsVideos.removeValue(forKey: path)
+        } else {
+            customBucketsVideos[path] = bucket
+        }
+        saveCustomBuckets()
+        log("Set custom videos bucket for \(url.lastPathComponent) to '\(bucket)'")
     }
     
     private func loadCustomBuckets() {
-        guard let data = customSourceBucketsJSON else { return }
-        customBuckets = (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
+        if let dataPhotos = customSourceBucketsPhotosJSON {
+            customBucketsPhotos = (try? JSONDecoder().decode([String: String].self, from: dataPhotos)) ?? [:]
+        }
+        if let dataVideos = customSourceBucketsVideosJSON {
+            customBucketsVideos = (try? JSONDecoder().decode([String: String].self, from: dataVideos)) ?? [:]
+        }
     }
 
     private func saveCustomBuckets() {
-        customSourceBucketsJSON = try? JSONEncoder().encode(customBuckets)
+        customSourceBucketsPhotosJSON = try? JSONEncoder().encode(customBucketsPhotos)
+        customSourceBucketsVideosJSON = try? JSONEncoder().encode(customBucketsVideos)
+    }
+
+    private func isVideoFile(_ url: URL) -> Bool {
+        let p = url.path.lowercased()
+        let isHyperlapse = p.contains("hyperlapse") || p.contains("timelapse")
+        let isPano = p.contains("panorama") || p.contains("pano")
+        
+        let ext = url.pathExtension.lowercased()
+        let videoExts = ["mp4", "mov", "mxf", "mts", "m4v"]
+        return isHyperlapse ? true : (isPano ? false : videoExts.contains(ext))
     }
 
     private func cameraBucket(for c: ImportCandidate) -> String {
+        let isVideo = isVideoFile(c.url)
         var customBase: String? = nil
         
-        if let root = getVolumeRootPath(for: c.url), let custom = customBuckets[root] {
-            customBase = custom
-        } else if let volName = c.url.pathComponents.dropFirst(2).first, let mapped = volumeBucketOverride[volName] {
+        if let root = getVolumeRootPath(for: c.url) {
+            customBase = isVideo ? customBucketsVideos[root] : customBucketsPhotos[root]
+        }
+        
+        if customBase == nil, let volName = c.url.pathComponents.dropFirst(2).first, let mapped = volumeBucketOverride[volName] {
             customBase = mapped
         }
         
         if let base = customBase {
-            return profileManager.applyCategory(to: base, url: c.url)
+            return base // Return literal bucket without appending Categories
         }
         return profileManager.bucket(for: c.url)
     }
@@ -572,7 +603,8 @@ final class ImportViewModel: ObservableObject {
     func removeVolumeFromList(for url: URL) {
         permissionService.removeVolumeBookmark(for: url, ignoredPaths: &sessionIgnoredPaths)
         if let root = getVolumeRootPath(for: url) {
-             customBuckets.removeValue(forKey: root)
+             customBucketsPhotos.removeValue(forKey: root)
+             customBucketsVideos.removeValue(forKey: root)
              saveCustomBuckets()
         }
         refreshVolumes(autoPrompt: false)
