@@ -29,26 +29,57 @@ struct SettingsView: View {
                 Text("Organization")
                     .sectionHeader()
                 
-                HStack {
-                    Image(systemName: "folder.fill")
-                        .foregroundColor(.accentSecondary)
-                    Text("Folder Structure")
-                        .font(.system(.body, design: .rounded).weight(.medium))
-                    Spacer()
-                    Picker("", selection: $vm.options.organizationMode) {
-                        ForEach(ImportOptions.OrganizationMode.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("Template", text: $vm.options.folderTemplate)
+                        .textFieldStyle(.plain)
+                        .font(.system(.body, design: .monospaced))
+                        .padding(8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.accentPrimary.opacity(0.1))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.accentPrimary.opacity(0.3), lineWidth: 1)
+                        )
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Insert Token:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 8) {
+                            folderTokenButton("{Camera}")
+                            folderTokenButton("{YYYY}")
+                            folderTokenButton("{MM}")
+                            folderTokenButton("{DD}")
+                        }
+                        
+                        HStack(spacing: 8) {
+                            folderTokenButton("/")
+                            
+                            Button(action: {
+                                vm.options.folderTemplate = ""
+                            }) {
+                                Text("Clear")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.red.opacity(0.1))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .labelsHidden()
-                    .frame(maxWidth: 160)
                 }
+                .padding(.vertical, 4)
                 
                 Text("Determines how imported files are grouped into folders at the destination.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     
-                FolderPreviewView(mode: vm.options.organizationMode)
+                FolderPreviewView(template: vm.options.folderTemplate)
                     .padding(.top, 4)
             }
             .modernCard(accentColor: .accentPrimary)
@@ -130,6 +161,20 @@ struct SettingsView: View {
         .padding(24)
         .frame(minWidth: 400, minHeight: 400, alignment: .topLeading)
     }
+    private func folderTokenButton(_ token: String) -> some View {
+        Button(action: {
+            vm.options.folderTemplate += token
+        }) {
+            Text(token)
+                .font(.caption.monospaced())
+                .foregroundColor(.accentColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.accentColor.opacity(0.1))
+                .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
+    }
     
     private func tokenButton(_ token: String) -> some View {
         Button(action: {
@@ -148,7 +193,7 @@ struct SettingsView: View {
 }
 
 struct FolderPreviewView: View {
-    let mode: ImportOptions.OrganizationMode
+    let template: String
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -160,15 +205,14 @@ struct FolderPreviewView: View {
                     .font(.system(.caption, design: .rounded).weight(.semibold))
             }
             
-            VStack(alignment: .leading, spacing: 4) {
-                if mode == .cameraFirst {
-                    cameraFirstTree
-                } else {
-                    dateFirstTree
-                }
-            }
-            .padding(.leading, 12)
-            .padding(.top, 2)
+            let segments = template
+                .components(separatedBy: "/")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            
+            DynamicFolderTree(segments: segments, index: 0)
+                .padding(.leading, 12)
+                .padding(.top, 2)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -179,51 +223,37 @@ struct FolderPreviewView: View {
                 .stroke(Color.accentPrimary.opacity(0.15), lineWidth: 1)
         )
     }
+}
+
+struct DynamicFolderTree: View {
+    let segments: [String]
+    let index: Int
     
-    private var cameraFirstTree: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            treeNode(icon: "folder.fill", text: "SONY_A7IV")
+    var body: some View {
+        if index < segments.count {
             VStack(alignment: .leading, spacing: 4) {
-                treeNode(icon: "folder.fill", text: "2026")
-                VStack(alignment: .leading, spacing: 4) {
-                    treeNode(icon: "folder.fill", text: "10_October")
-                    VStack(alignment: .leading, spacing: 4) {
-                        treeNode(icon: "folder.fill", text: "24")
-                        VStack(alignment: .leading, spacing: 4) {
-                            treeNode(icon: "photo.fill", text: "A7IV_001.ARW")
-                            treeNode(icon: "video.fill", text: "A7IV_002.MP4")
-                        }
-                        .padding(.leading, 14)
-                    }
+                let seg = mockValue(for: segments[index])
+                treeNode(icon: "folder.fill", text: seg)
+                
+                DynamicFolderTree(segments: segments, index: index + 1)
                     .padding(.leading, 14)
-                }
-                .padding(.leading, 14)
             }
-            .padding(.leading, 14)
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                treeNode(icon: "photo.fill", text: "A7IV_001.ARW")
+                treeNode(icon: "video.fill", text: "A7IV_002.MP4")
+            }
+            .padding(.top, 2)
         }
     }
     
-    private var dateFirstTree: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            treeNode(icon: "folder.fill", text: "2026")
-            VStack(alignment: .leading, spacing: 4) {
-                treeNode(icon: "folder.fill", text: "10_October")
-                VStack(alignment: .leading, spacing: 4) {
-                    treeNode(icon: "folder.fill", text: "24")
-                    VStack(alignment: .leading, spacing: 4) {
-                        treeNode(icon: "folder.fill", text: "SONY_A7IV")
-                        VStack(alignment: .leading, spacing: 4) {
-                            treeNode(icon: "photo.fill", text: "A7IV_001.ARW")
-                            treeNode(icon: "video.fill", text: "A7IV_002.MP4")
-                        }
-                        .padding(.leading, 14)
-                    }
-                    .padding(.leading, 14)
-                }
-                .padding(.leading, 14)
-            }
-            .padding(.leading, 14)
-        }
+    private func mockValue(for token: String) -> String {
+        var s = token
+        s = s.replacingOccurrences(of: "{YYYY}", with: "2026")
+        s = s.replacingOccurrences(of: "{MM}", with: "10_October")
+        s = s.replacingOccurrences(of: "{DD}", with: "24")
+        s = s.replacingOccurrences(of: "{Camera}", with: "SONY_A7IV")
+        return s
     }
     
     private func treeNode(icon: String, text: String) -> some View {

@@ -484,14 +484,22 @@ final class ImportViewModel: ObservableObject {
 
         let bucket = cameraBucket(for: c)
         
-        let desired: [String]
-        switch options.organizationMode {
-        case .cameraFirst:
-            desired = [bucket, "\(y)", monthFolder, dayFolder]
-        case .dateFirst:
-            desired = ["\(y)", monthFolder, dayFolder, bucket]
+        let template = options.folderTemplate
+        var segments = template.components(separatedBy: "/")
+        
+        // Remove empty segments
+        segments = segments.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        
+        var desired: [String] = []
+        for seg in segments {
+            var s = seg
+            s = s.replacingOccurrences(of: "{YYYY}", with: "\(y)")
+            s = s.replacingOccurrences(of: "{MM}", with: monthFolder)
+            s = s.replacingOccurrences(of: "{DD}", with: dayFolder)
+            s = s.replacingOccurrences(of: "{Camera}", with: bucket)
+            desired.append(s)
         }
-
+        
         var url = root.standardizedFileURL
         let existing = Set(url.pathComponents.map { $0.lowercased() })
 
