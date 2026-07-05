@@ -6,6 +6,7 @@ enum SidebarTab: Hashable {
     case appearance
 }
 
+@MainActor
 struct SidebarContentView: View {
     @StateObject private var vm = ImportViewModel()
     @State private var selectedTab: SidebarTab? = .home
