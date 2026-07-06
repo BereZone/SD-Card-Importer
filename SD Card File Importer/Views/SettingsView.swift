@@ -5,7 +5,8 @@ struct SettingsView: View {
     @State private var newBucketName: String = ""
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
             HStack {
                 Image(systemName: "gearshape.fill")
                     .font(.system(size: 24))
@@ -223,8 +224,10 @@ struct SettingsView: View {
             .modernCard(accentColor: .accentPrimary)
             
             Spacer()
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(24)
         .frame(minWidth: 400, minHeight: 400, alignment: .topLeading)
     }
     private func folderTokenButton(_ token: String) -> some View {
