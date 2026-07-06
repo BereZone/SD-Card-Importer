@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var vm: ImportViewModel
+    @State private var newBucketName: String = ""
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -155,6 +156,71 @@ struct SettingsView: View {
                 }
             }
             .modernCard(accentColor: .accentSecondary)
+            
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Bucket Dropdown Options")
+                    .sectionHeader()
+                
+                Text("Manage the pre-defined folder names that appear in the SD Card list dropdown.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                VStack(spacing: 8) {
+                    ForEach(vm.dropdownBuckets, id: \.self) { bucket in
+                        if bucket != "Auto-Detect" && bucket != "Custom..." {
+                            HStack {
+                                Text(bucket)
+                                    .font(.system(.body, design: .rounded))
+                                Spacer()
+                                Button(action: {
+                                    vm.dropdownBuckets.removeAll(where: { $0 == bucket })
+                                    vm.saveDropdownBuckets()
+                                }) {
+                                    Image(systemName: "trash.fill")
+                                        .foregroundColor(.red.opacity(0.8))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 12)
+                            .background(Color.cardBackgroundSecondary)
+                            .cornerRadius(6)
+                        }
+                    }
+                }
+                
+                HStack {
+                    TextField("New bucket name", text: $newBucketName)
+                        .textFieldStyle(.plain)
+                        .font(.system(.body, design: .rounded))
+                        .padding(8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.accentPrimary.opacity(0.1))
+                        )
+                    
+                    Button(action: {
+                        let trimmed = newBucketName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !trimmed.isEmpty && !vm.dropdownBuckets.contains(trimmed) {
+                            // Insert before Custom... if it exists
+                            if let customIndex = vm.dropdownBuckets.firstIndex(of: "Custom...") {
+                                vm.dropdownBuckets.insert(trimmed, at: customIndex)
+                            } else {
+                                vm.dropdownBuckets.append(trimmed)
+                            }
+                            vm.saveDropdownBuckets()
+                            newBucketName = ""
+                        }
+                    }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.accentPrimary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 4)
+            }
+            .modernCard(accentColor: .accentPrimary)
             
             Spacer()
         }

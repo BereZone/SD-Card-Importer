@@ -37,6 +37,10 @@ final class ImportViewModel: ObservableObject {
     @AppStorage("customSourceBucketsVideosJSON") var customSourceBucketsVideosJSON: Data?
     @Published var customBucketsPhotos: [String: String] = [:]
     @Published var customBucketsVideos: [String: String] = [:]
+    
+    @AppStorage("customDropdownBucketsJSON") var customDropdownBucketsJSON: Data?
+    @Published var dropdownBuckets: [String] = []
+    
     // Optional: map specific volume names to bucket names
     let volumeBucketOverride: [String: String] = [:]
 
@@ -464,11 +468,29 @@ final class ImportViewModel: ObservableObject {
         if let dataVideos = customSourceBucketsVideosJSON {
             customBucketsVideos = (try? JSONDecoder().decode([String: String].self, from: dataVideos)) ?? [:]
         }
+        
+        if let dropData = customDropdownBucketsJSON, let decoded = try? JSONDecoder().decode([String].self, from: dropData) {
+            dropdownBuckets = decoded
+        } else {
+            dropdownBuckets = [
+                "Auto-Detect",
+                "Pocket3",
+                "Action4",
+                "A7C",
+                "Mini4Pro",
+                "Phone",
+                "Custom..."
+            ]
+        }
     }
 
     private func saveCustomBuckets() {
         customSourceBucketsPhotosJSON = try? JSONEncoder().encode(customBucketsPhotos)
         customSourceBucketsVideosJSON = try? JSONEncoder().encode(customBucketsVideos)
+    }
+    
+    func saveDropdownBuckets() {
+        customDropdownBucketsJSON = try? JSONEncoder().encode(dropdownBuckets)
     }
 
     private func isVideoFile(_ url: URL) -> Bool {

@@ -111,11 +111,11 @@ struct SDCardsSection: View {
         let volumeKey = vm.getVolumeRootPath(for: url) ?? ""
         
         let currentPhotosBucket = vm.customBucketsPhotos[volumeKey] ?? "Auto-Detect"
-        let isPhotosCustomSaved = !predefinedBuckets.contains(currentPhotosBucket) && currentPhotosBucket != "Auto-Detect"
+        let isPhotosCustomSaved = !vm.dropdownBuckets.contains(currentPhotosBucket) && currentPhotosBucket != "Auto-Detect"
         let isPhotosPickerCustom = (currentPhotosBucket == "Custom..." || isPhotosCustomSaved)
         
         let currentVideosBucket = vm.customBucketsVideos[volumeKey] ?? "Auto-Detect"
-        let isVideosCustomSaved = !predefinedBuckets.contains(currentVideosBucket) && currentVideosBucket != "Auto-Detect"
+        let isVideosCustomSaved = !vm.dropdownBuckets.contains(currentVideosBucket) && currentVideosBucket != "Auto-Detect"
         let isVideosPickerCustom = (currentVideosBucket == "Custom..." || isVideosCustomSaved)
         
         return VStack(alignment: .leading, spacing: 10) {
@@ -250,7 +250,7 @@ struct SDCardsSection: View {
                 }
             }
         )) {
-            ForEach(predefinedBuckets, id: \.self) { bucketName in
+            ForEach(vm.dropdownBuckets, id: \.self) { bucketName in
                 Text(bucketName).tag(bucketName)
             }
         }
