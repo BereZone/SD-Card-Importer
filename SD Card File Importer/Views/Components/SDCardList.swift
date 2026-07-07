@@ -9,6 +9,7 @@ struct SDCardsSection: View {
     @ObservedObject var vm: ImportViewModel
     @State private var tempCustomPhotosName: [String: String] = [:]
     @State private var tempCustomVideosName: [String: String] = [:]
+    @State private var isPulsing = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -81,22 +82,37 @@ struct SDCardsSection: View {
     }
     
     private var emptyView: some View {
-        VStack(spacing: 4) {
-            Image(systemName: "externaldrive.badge.questionmark")
-                .font(.system(size: 32))
-                .foregroundColor(.secondary.opacity(0.5))
-            Text("No SD cards detected")
-                .font(.system(.subheadline, design: .rounded).weight(.medium))
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-            Text("Insert an SD card or click 'Add SD Card'")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .lineLimit(1)
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(Color.accentSecondary.opacity(0.1))
+                    .frame(width: 80, height: 80)
+                    .scaleEffect(isPulsing ? 1.2 : 0.8)
+                    .opacity(isPulsing ? 0 : 1)
+                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: false), value: isPulsing)
+                
+                Circle()
+                    .fill(Color.accentSecondary.opacity(0.1))
+                    .frame(width: 60, height: 60)
+                
+                Image(systemName: "sdcard")
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundColor(.accentSecondary)
+            }
+            .padding(.top, 10)
+            
+            VStack(spacing: 4) {
+                Text("Waiting for Media")
+                    .font(.system(.headline, design: .rounded).weight(.semibold))
+                    .foregroundColor(.primary)
+                Text("Insert an SD card or click 'Add'")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundColor(.secondary)
+            }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
+        .padding(.vertical, 30)
+        .onAppear { isPulsing = true }
     }
     
     private var list: some View {

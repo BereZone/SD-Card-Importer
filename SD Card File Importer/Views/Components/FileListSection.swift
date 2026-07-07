@@ -6,6 +6,7 @@ struct FileListSection: View {
     @State private var previewURL: URL?
     @AppStorage("uiThumbnailSize") private var uiThumbnailSize: Double = 32.0
     @AppStorage("showPreviews") private var showPreviews: Bool = true
+    @State private var isPulsing = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -51,19 +52,37 @@ struct FileListSection: View {
     }
     
     private var emptyFilesView: some View {
-        VStack(spacing: 4) {
-            Image(systemName: "doc.text.magnifyingglass")
-                .font(.system(size: 28))
-                .foregroundColor(.secondary.opacity(0.5))
-            Text("No files found")
-                .font(.system(.subheadline, design: .rounded).weight(.medium))
-                .foregroundColor(.secondary)
-            Text("Click 'Scan SD Cards' to find files")
-                .font(.caption2)
-                .foregroundColor(.secondary)
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(Color.accentSecondary.opacity(0.1))
+                    .frame(width: 80, height: 80)
+                    .scaleEffect(isPulsing ? 1.2 : 0.8)
+                    .opacity(isPulsing ? 0 : 1)
+                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: false), value: isPulsing)
+                
+                Circle()
+                    .fill(Color.accentSecondary.opacity(0.1))
+                    .frame(width: 60, height: 60)
+                
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundColor(.accentSecondary)
+            }
+            .padding(.top, 10)
+            
+            VStack(spacing: 4) {
+                Text("Waiting for Media")
+                    .font(.system(.headline, design: .rounded).weight(.semibold))
+                    .foregroundColor(.primary)
+                Text("Insert an SD card to find files")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundColor(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.vertical, 12)
+        .padding(.vertical, 30)
+        .onAppear { isPulsing = true }
     }
     
     private var filesList: some View {
