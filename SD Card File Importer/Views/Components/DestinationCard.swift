@@ -55,6 +55,17 @@ struct DestinationCard: View {
                 .buttonStyle(SecondaryButtonStyle())
             }
             
+            if let storage = vm.destinationStorage {
+                Divider()
+                    .padding(.vertical, 4)
+                
+                StorageCapacityBar(
+                    totalCapacity: storage.total,
+                    availableCapacity: storage.available,
+                    pendingCapacity: vm.pendingImportSize
+                )
+            }
+            
             Spacer(minLength: 0)
         }
         .modernCard(accentColor: .accentPrimary)

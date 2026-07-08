@@ -164,17 +164,26 @@ struct SDCardsSection: View {
                 
                 Spacer()
                 
-                Button(role: .destructive) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        vm.removeVolumeFromList(for: url)
-                    }
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
+                Button(action: {
+                    vm.removeVolumeFromList(for: url)
+                }) {
+                    Image(systemName: "eject.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(Color.secondary.opacity(0.1))
+                        .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .contentShape(Rectangle())
+            }
+            
+            if let storage = vm.getStorageInfo(for: url) {
+                StorageCapacityBar(
+                    totalCapacity: storage.total,
+                    availableCapacity: storage.available,
+                    pendingCapacity: 0
+                )
+                .padding(.vertical, 4)
             }
             
             Divider()

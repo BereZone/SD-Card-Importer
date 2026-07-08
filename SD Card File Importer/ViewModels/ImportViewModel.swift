@@ -32,6 +32,12 @@ final class ImportViewModel: ObservableObject {
         candidates.filter { !disabledCandidates.contains($0.id) }.count
     }
     
+    var pendingImportSize: Int64 {
+        candidates
+            .filter { !disabledCandidates.contains($0.id) }
+            .reduce(0) { $0 + Int64($1.fileSize) }
+    }
+    
     // Buckets
     @AppStorage("customSourceBucketsPhotosJSON") var customSourceBucketsPhotosJSON: Data?
     @AppStorage("customSourceBucketsVideosJSON") var customSourceBucketsVideosJSON: Data?
@@ -52,9 +58,14 @@ final class ImportViewModel: ObservableObject {
         didSet {
             if destinationURL != nil {
                 storeDestinationBookmark()
+                updateDestinationStorage()
+            } else {
+                destinationStorage = nil
             }
         }
     }
+    
+    @Published var destinationStorage: (total: Int64, available: Int64)?
     
     // Observers
     private var observers: [NSObjectProtocol] = []
@@ -618,6 +629,23 @@ final class ImportViewModel: ObservableObject {
     private func storeDestinationBookmark() {
         guard let url = destinationURL else { destBookmarkData = nil; return }
         destBookmarkData = permissionService.storeDestinationBookmark(for: url)
+    }
+    
+    func updateDestinationStorage() {
+        guard let url = destinationURL else { return }
+        destinationStorage = getStorageInfo(for: url)
+    }
+    
+    func getStorageInfo(for url: URL) -> (total: Int64, available: Int64)? {
+        do {
+            let values = try url.resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityKey])
+            if let total = values.volumeTotalCapacity, let available = values.volumeAvailableCapacity {
+                return (Int64(total), Int64(available))
+            }
+            return nil
+        } catch {
+            return nil
+        }
     }
     
     // MARK: - Helpers
