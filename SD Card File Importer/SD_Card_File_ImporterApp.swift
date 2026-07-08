@@ -5,7 +5,7 @@ struct VideoImporterApp: App {
     @AppStorage("appTheme") private var appTheme: AppTheme = .system
     
     var body: some Scene {
-        WindowGroup {
+        WindowGroup("SD Card Import") {
             SidebarContentView()
                 .preferredColorScheme(appTheme.colorScheme)
         }
