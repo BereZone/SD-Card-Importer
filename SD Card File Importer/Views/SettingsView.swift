@@ -1,8 +1,10 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var vm: ImportViewModel
     @State private var newBucketName: String = ""
+    @State private var draggedBucket: String?
     
     var body: some View {
         ScrollView {
@@ -170,6 +172,11 @@ struct SettingsView: View {
                     ForEach(vm.dropdownBuckets, id: \.self) { bucket in
                         if bucket != "Auto-Detect" && bucket != "Custom..." {
                             HStack {
+                                Image(systemName: "line.3.horizontal")
+                                    .foregroundColor(.secondary.opacity(0.5))
+                                    .font(.system(size: 14))
+                                    .padding(.trailing, 4)
+                                
                                 Text(bucket)
                                     .font(.system(.body, design: .rounded))
                                 Spacer()
@@ -186,6 +193,13 @@ struct SettingsView: View {
                             .padding(.horizontal, 12)
                             .background(Color.cardBackgroundSecondary)
                             .cornerRadius(6)
+                            .onDrag {
+                                self.draggedBucket = bucket
+                                return NSItemProvider(object: bucket as NSString)
+                            }
+                            .onDrop(of: [.text], delegate: BucketDropDelegate(item: bucket, items: $vm.dropdownBuckets, draggedItem: $draggedBucket, saveAction: {
+                                vm.saveDropdownBuckets()
+                            }))
                         }
                     }
                 }
@@ -334,5 +348,33 @@ struct DynamicFolderTree: View {
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(.primary)
         }
+    }
+}
+
+struct BucketDropDelegate: DropDelegate {
+    let item: String
+    @Binding var items: [String]
+    @Binding var draggedItem: String?
+    var saveAction: () -> Void
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedItem = nil
+        saveAction()
+        return true
+    }
+    
+    func dropEntered(info: DropInfo) {
+        guard let draggedItem = self.draggedItem else { return }
+        if draggedItem != item {
+            guard let from = items.firstIndex(of: draggedItem),
+                  let to = items.firstIndex(of: item) else { return }
+            withAnimation(.default) {
+                items.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+            }
+        }
+    }
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
     }
 }
