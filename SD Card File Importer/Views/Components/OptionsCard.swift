@@ -32,16 +32,31 @@ struct OptionsCard: View {
                 .lineLimit(1)
                 
                 if options.dateFilter == .customRange {
-                    HStack(spacing: 4) {
+                    HStack {
                         DatePicker("", selection: $options.customStartDate, displayedComponents: .date)
                             .labelsHidden()
-                        Text("to")
+                            .frame(width: 110, alignment: .center)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.secondary)
-                            .font(.system(.body, design: .rounded))
+                        
+                        Spacer()
+                        
                         DatePicker("", selection: $options.customEndDate, displayedComponents: .date)
                             .labelsHidden()
+                            .frame(width: 110, alignment: .center)
                     }
-                    .padding(.leading, 32)
+                    .padding(8)
+                    .background(Color.secondary.opacity(0.05))
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                    )
+                    .padding(.leading, 28)
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
                 
