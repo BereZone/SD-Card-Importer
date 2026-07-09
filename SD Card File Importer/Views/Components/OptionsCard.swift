@@ -3,6 +3,8 @@ import SwiftUI
 struct OptionsCard: View {
     @Binding var options: ImportOptions
     @AppStorage("uiThumbnailSize") private var uiThumbnailSize: Double = 32.0
+    @State private var showingStartCalendar = false
+    @State private var showingEndCalendar = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -33,9 +35,19 @@ struct OptionsCard: View {
                 
                 if options.dateFilter == .customRange {
                     HStack {
-                        DatePicker("", selection: $options.customStartDate, displayedComponents: .date)
-                            .labelsHidden()
-                            .frame(width: 110, alignment: .center)
+                        Button(action: { showingStartCalendar.toggle() }) {
+                            Text(options.customStartDate, format: .dateTime.month(.defaultDigits).day().year())
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundColor(.primary)
+                                .frame(width: 110)
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $showingStartCalendar, arrowEdge: .bottom) {
+                            DatePicker("", selection: $options.customStartDate, displayedComponents: .date)
+                                .datePickerStyle(.graphical)
+                                .labelsHidden()
+                                .padding()
+                        }
                         
                         Spacer()
                         
@@ -45,9 +57,19 @@ struct OptionsCard: View {
                         
                         Spacer()
                         
-                        DatePicker("", selection: $options.customEndDate, displayedComponents: .date)
-                            .labelsHidden()
-                            .frame(width: 110, alignment: .center)
+                        Button(action: { showingEndCalendar.toggle() }) {
+                            Text(options.customEndDate, format: .dateTime.month(.defaultDigits).day().year())
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundColor(.primary)
+                                .frame(width: 110)
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $showingEndCalendar, arrowEdge: .bottom) {
+                            DatePicker("", selection: $options.customEndDate, displayedComponents: .date)
+                                .datePickerStyle(.graphical)
+                                .labelsHidden()
+                                .padding()
+                        }
                     }
                     .padding(8)
                     .background(Color.secondary.opacity(0.05))
