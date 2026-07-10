@@ -6,6 +6,7 @@ struct FileListSection: View {
     @State private var previewURL: URL?
     @AppStorage("uiThumbnailSize") private var uiThumbnailSize: Double = 32.0
     @AppStorage("showPreviews") private var showPreviews: Bool = true
+    @AppStorage("isGridView") private var isGridView: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -31,6 +32,20 @@ struct FileListSection: View {
                             .font(.caption)
                             .buttonStyle(.plain)
                             .foregroundColor(.secondary)
+                            
+                        Divider().frame(height: 12)
+                        
+                        Button(action: { isGridView = false }) {
+                            Image(systemName: "list.bullet")
+                                .foregroundColor(isGridView ? .secondary : .accentColor)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Button(action: { isGridView = true }) {
+                            Image(systemName: "square.grid.2x2")
+                                .foregroundColor(isGridView ? .accentColor : .secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
                     .padding(.trailing, 8)
                 }
@@ -68,11 +83,23 @@ struct FileListSection: View {
         .padding(.vertical, 30)
     }
     
+    private let columns = [GridItem(.adaptive(minimum: 120, maximum: 200), spacing: 12)]
+    
     private var filesList: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: CGFloat(10 - (32 - uiThumbnailSize)/3)) {
-                ForEach(vm.candidates) { c in
-                    FileRow(candidate: c, vm: vm, previewURL: $previewURL)
+            if isGridView {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(vm.candidates) { c in
+                        FileGridItem(candidate: c, vm: vm, previewURL: $previewURL)
+                    }
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 8)
+            } else {
+                LazyVStack(alignment: .leading, spacing: CGFloat(10 - (32 - uiThumbnailSize)/3)) {
+                    ForEach(vm.candidates) { c in
+                        FileRow(candidate: c, vm: vm, previewURL: $previewURL)
+                    }
                 }
             }
         }
@@ -134,6 +161,77 @@ struct FileRow: View {
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.cardBackgroundSecondary)
+        )
+        .contextMenu {
+            Button("View in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting([candidate.url])
+            }
+        }
+    }
+    
+    private func byteCount(_ n: UInt64) -> String {
+        let f = ByteCountFormatter()
+        f.allowedUnits = [.useMB, .useGB]
+        f.countStyle = .file
+        return f.string(fromByteCount: Int64(n))
+    }
+}
+
+struct FileGridItem: View {
+    let candidate: ImportCandidate
+    @ObservedObject var vm: ImportViewModel
+    @Binding var previewURL: URL?
+    @AppStorage("showPreviews") private var showPreviews: Bool = true
+    
+    var body: some View {
+        let ext = candidate.url.pathExtension.lowercased()
+        let isSelected = !vm.disabledCandidates.contains(candidate.id)
+        
+        VStack(spacing: 8) {
+            ZStack(alignment: .topLeading) {
+                ThumbnailView(url: candidate.url, size: 100, show: showPreviews)
+                    .frame(maxWidth: .infinity, maxHeight: 100)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        previewURL = candidate.url
+                    }
+                
+                Toggle("", isOn: Binding(
+                    get: { isSelected },
+                    set: { _ in vm.toggleSelection(for: candidate) }
+                ))
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .padding(6)
+            }
+            
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(candidate.url.lastPathComponent)
+                        .font(.system(.caption, design: .rounded))
+                        .lineLimit(1)
+                    Text(byteCount(candidate.fileSize))
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Text(ext.uppercased())
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color.secondary.opacity(0.15)))
+            }
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? Color.accentPrimary.opacity(0.1) : Color.cardBackgroundSecondary)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isSelected ? Color.accentPrimary.opacity(0.5) : Color.clear, lineWidth: 1)
         )
         .contextMenu {
             Button("View in Finder") {
