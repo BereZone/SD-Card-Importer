@@ -16,16 +16,23 @@ struct FileListSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "doc.on.doc.fill")
-                    .font(.title2)
-                    .foregroundColor(.accentSecondary)
-                Text("Found Files")
-                    .sectionHeader()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                
-                Spacer()
+            VStack(spacing: 12) {
+                HStack {
+                    Image(systemName: "doc.on.doc.fill")
+                        .font(.title2)
+                        .foregroundColor(.accentSecondary)
+                    Text("Found Files")
+                        .sectionHeader()
+                        .layoutPriority(1)
+                    
+                    Spacer()
+                    
+                    StatusBadge(
+                        text: "\(vm.selectedCandidatesCount)/\(vm.candidates.count) files",
+                        color: vm.candidates.isEmpty ? .secondary : .successGreen
+                    )
+                    .layoutPriority(1)
+                }
                 
                 if !vm.candidates.isEmpty {
                     HStack(spacing: 12) {
@@ -39,39 +46,37 @@ struct FileListSection: View {
                             .buttonStyle(.plain)
                             .foregroundColor(.secondary)
                             
-                        Divider().frame(height: 12)
+                        Spacer()
                         
-                        Button(action: { layout = .list }) {
-                            Image(systemName: "list.bullet")
-                                .foregroundColor(layout == .list ? .accentColor : .secondary)
+                        HStack(spacing: 16) {
+                            Button(action: { layout = .list }) {
+                                Image(systemName: "list.bullet")
+                                    .foregroundColor(layout == .list ? .accentColor : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                            
+                            Button(action: { layout = .grid }) {
+                                Image(systemName: "square.grid.2x2")
+                                    .foregroundColor(layout == .grid ? .accentColor : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                            
+                            Button(action: { layout = .table }) {
+                                Image(systemName: "tablecells")
+                                    .foregroundColor(layout == .table ? .accentColor : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                            
+                            Button(action: { layout = .calendar }) {
+                                Image(systemName: "calendar")
+                                    .foregroundColor(layout == .calendar ? .accentColor : .secondary)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
-                        
-                        Button(action: { layout = .grid }) {
-                            Image(systemName: "square.grid.2x2")
-                                .foregroundColor(layout == .grid ? .accentColor : .secondary)
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Button(action: { layout = .table }) {
-                            Image(systemName: "tablecells")
-                                .foregroundColor(layout == .table ? .accentColor : .secondary)
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Button(action: { layout = .calendar }) {
-                            Image(systemName: "calendar")
-                                .foregroundColor(layout == .calendar ? .accentColor : .secondary)
-                        }
-                        .buttonStyle(.plain)
                     }
-                    .padding(.trailing, 8)
+                    .padding(.top, 4)
+                    .padding(.bottom, 4)
                 }
-                
-                StatusBadge(
-                    text: "\(vm.selectedCandidatesCount)/\(vm.candidates.count) files",
-                    color: vm.candidates.isEmpty ? .secondary : .successGreen
-                )
             }
             
             if vm.candidates.isEmpty {
