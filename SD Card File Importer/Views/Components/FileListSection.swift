@@ -1,12 +1,18 @@
 import SwiftUI
 import QuickLook
 
+enum FileListLayout: String, CaseIterable, Identifiable {
+    case list, grid, table, calendar
+    var id: String { rawValue }
+}
+import QuickLook
+
 struct FileListSection: View {
     @ObservedObject var vm: ImportViewModel
     @State private var previewURL: URL?
     @AppStorage("uiThumbnailSize") private var uiThumbnailSize: Double = 32.0
     @AppStorage("showPreviews") private var showPreviews: Bool = true
-    @AppStorage("isGridView") private var isGridView: Bool = false
+    @AppStorage("fileListLayout") private var layout: FileListLayout = .list
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -35,15 +41,27 @@ struct FileListSection: View {
                             
                         Divider().frame(height: 12)
                         
-                        Button(action: { isGridView = false }) {
+                        Button(action: { layout = .list }) {
                             Image(systemName: "list.bullet")
-                                .foregroundColor(isGridView ? .secondary : .accentColor)
+                                .foregroundColor(layout == .list ? .accentColor : .secondary)
                         }
                         .buttonStyle(.plain)
                         
-                        Button(action: { isGridView = true }) {
+                        Button(action: { layout = .grid }) {
                             Image(systemName: "square.grid.2x2")
-                                .foregroundColor(isGridView ? .accentColor : .secondary)
+                                .foregroundColor(layout == .grid ? .accentColor : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Button(action: { layout = .table }) {
+                            Image(systemName: "tablecells")
+                                .foregroundColor(layout == .table ? .accentColor : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Button(action: { layout = .calendar }) {
+                            Image(systemName: "calendar")
+                                .foregroundColor(layout == .calendar ? .accentColor : .secondary)
                         }
                         .buttonStyle(.plain)
                     }
@@ -86,25 +104,123 @@ struct FileListSection: View {
     private let columns = [GridItem(.adaptive(minimum: 120, maximum: 200), spacing: 12)]
     
     private var filesList: some View {
-        ScrollView {
-            if isGridView {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(vm.candidates) { c in
-                        FileGridItem(candidate: c, vm: vm, previewURL: $previewURL)
+        Group {
+            switch layout {
+            case .list:
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: CGFloat(10 - (32 - uiThumbnailSize)/3)) {
+                        ForEach(vm.candidates) { c in
+                            FileRow(candidate: c, vm: vm, previewURL: $previewURL)
+                        }
                     }
                 }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 8)
-            } else {
-                LazyVStack(alignment: .leading, spacing: CGFloat(10 - (32 - uiThumbnailSize)/3)) {
-                    ForEach(vm.candidates) { c in
-                        FileRow(candidate: c, vm: vm, previewURL: $previewURL)
+            case .grid:
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(vm.candidates) { c in
+                            FileGridItem(candidate: c, vm: vm, previewURL: $previewURL)
+                        }
                     }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 8)
                 }
+            case .table:
+                tableLayout
+            case .calendar:
+                calendarLayout
             }
         }
         .frame(maxHeight: .infinity)
         .quickLookPreview($previewURL)
+    }
+    
+    private var tableLayout: some View {
+        Table(vm.candidates) {
+            TableColumn("Import") { c in
+                let isSelected = !vm.disabledCandidates.contains(c.id)
+                Toggle("", isOn: Binding(
+                    get: { isSelected },
+                    set: { _ in vm.toggleSelection(for: c) }
+                ))
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+            }
+            .width(50)
+            
+            TableColumn("Thumbnail") { c in
+                ThumbnailView(url: c.url, size: 24, show: showPreviews)
+                    .frame(width: 24, height: 24)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+            .width(60)
+            
+            TableColumn("Name") { c in
+                Text(c.url.lastPathComponent)
+                    .font(.system(.body, design: .rounded))
+            }
+            
+            TableColumn("Size") { c in
+                Text(byteCount(c.fileSize))
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+            .width(80)
+            
+            TableColumn("Date") { c in
+                Text(c.date, style: .date)
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+            .width(100)
+            
+            TableColumn("Type") { c in
+                Text(c.url.pathExtension.uppercased())
+                    .font(.system(.caption, design: .rounded).weight(.bold))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color.secondary.opacity(0.15)))
+            }
+            .width(50)
+        }
+    }
+    
+    private var calendarLayout: some View {
+        let grouped = Dictionary(grouping: vm.candidates) { c in
+            Calendar.current.startOfDay(for: c.date)
+        }
+        let sortedDates = grouped.keys.sorted(by: >)
+        
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: 20) {
+                ForEach(sortedDates, id: \.self) { date in
+                    Section {
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(grouped[date] ?? []) { c in
+                                FileGridItem(candidate: c, vm: vm, previewURL: $previewURL)
+                            }
+                        }
+                    } header: {
+                        Text(date, format: .dateTime.month(.wide).day().year())
+                            .font(.system(.title3, design: .rounded).weight(.bold))
+                            .foregroundColor(.primary)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 12)
+                            .background(Capsule().fill(Color.cardBackgroundSecondary))
+                            .padding(.top, 8)
+                    }
+                }
+            }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 16)
+        }
+    }
+    
+    private func byteCount(_ n: UInt64) -> String {
+        let f = ByteCountFormatter()
+        f.allowedUnits = [.useMB, .useGB]
+        f.countStyle = .file
+        return f.string(fromByteCount: Int64(n))
     }
 }
 
