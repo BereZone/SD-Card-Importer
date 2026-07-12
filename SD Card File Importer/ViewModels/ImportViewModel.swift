@@ -81,7 +81,7 @@ final class ImportViewModel: ObservableObject {
         
         // Restore source bookmarks
         _ = permissionService.restoreSourceBookmarks()
-        refreshVolumes(autoPrompt: true)
+        refreshVolumes(autoPrompt: true, autoScan: true)
     }
     
     deinit {
@@ -91,7 +91,7 @@ final class ImportViewModel: ObservableObject {
     
     // MARK: - Logic
     
-    func refreshVolumes(autoPrompt: Bool = false) {
+    func refreshVolumes(autoPrompt: Bool = false, autoScan: Bool = false) {
         log("Refreshing volumes…")
         candidates = []
         disabledCandidates = []
@@ -131,19 +131,23 @@ final class ImportViewModel: ObservableObject {
         if autoPrompt {
             let unscoped = removableVolumes.filter { permissionService.scopedURLForVolumePath[$0.standardizedFileURL.path] == nil }
             if !unscoped.isEmpty {
-                Task { await requestAccess(to: unscoped) }
+                Task { await requestAccess(to: unscoped, autoScan: autoScan) }
+            } else if autoScan && !removableVolumes.isEmpty {
+                scanForCandidates()
             }
+        } else if autoScan && !removableVolumes.isEmpty {
+            scanForCandidates()
         }
     }
     
-    func requestAccess(to volumes: [URL]) async {
+    func requestAccess(to volumes: [URL], autoScan: Bool = false) async {
         let granted = await permissionService.promptForAccess(to: volumes)
         if !granted.isEmpty {
             permissionService.appendSourceBookmarks(for: granted)
             for u in granted {
                 sessionIgnoredPaths.remove(u.standardizedFileURL.path)
             }
-            refreshVolumes()
+            refreshVolumes(autoPrompt: false, autoScan: autoScan)
             log("Granted access for: \(granted.map(\.lastPathComponent))")
         } else {
             log("Access not granted; scanning will show 0 files.")
@@ -160,7 +164,7 @@ final class ImportViewModel: ObservableObject {
         if panel.runModal() == .OK {
              permissionService.appendSourceBookmarks(for: panel.urls)
              for u in panel.urls { sessionIgnoredPaths.remove(u.standardizedFileURL.path) }
-             refreshVolumes()
+             refreshVolumes(autoPrompt: false, autoScan: true)
              log("Granted access for: \(panel.urls.map(\.lastPathComponent))")
         }
     }
@@ -687,7 +691,7 @@ final class ImportViewModel: ObservableObject {
             // The warning happens because the BLOCK is not isolated.
             Task { @MainActor in
                 self.log("Volume mounted")
-                self.refreshVolumes(autoPrompt: true)
+                self.refreshVolumes(autoPrompt: true, autoScan: true)
             }
         }
         
