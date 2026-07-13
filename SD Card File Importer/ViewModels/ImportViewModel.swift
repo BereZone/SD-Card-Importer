@@ -93,6 +93,15 @@ final class ImportViewModel: ObservableObject {
     
     func refreshVolumes(autoPrompt: Bool = false, autoScan: Bool = false) {
         log("Refreshing volumes…")
+        
+        // Attempt to reconnect to the destination drive if it just mounted
+        if destinationURL == nil, let data = destBookmarkData {
+            if let restored = permissionService.restoreDestinationBookmark(from: data) {
+                destinationURL = restored
+                log("Restored destination drive connection.")
+            }
+        }
+        
         candidates = []
         disabledCandidates = []
         
