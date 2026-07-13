@@ -5,7 +5,12 @@ struct CameraProfileManager {
     
     let profiles: [CameraProfile] = [
         DJIProfile(),
-        SonyProfile()
+        SonyProfile(),
+        CanonProfile(),
+        NikonProfile(),
+        PanasonicProfile(),
+        FujifilmProfile(),
+        GenericCameraProfile()
     ]
     
     func baseBucket(for url: URL) -> String? {
