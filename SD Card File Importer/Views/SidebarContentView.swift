@@ -41,7 +41,7 @@ struct SidebarContentView: View {
             case .appearance:
                 AppearanceView()
             case .none:
-                Text("Select an item from the sidebar")
+                Text("Select item from the sidebar")
                     .foregroundColor(.secondary)
             }
             }
