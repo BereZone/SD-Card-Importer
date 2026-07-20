@@ -14,9 +14,7 @@ actor ThumbnailService {
         }
         
         // Only attempt for likely media files
-        let ext = url.pathExtension.lowercased()
-        let likelyMedia = ["jpg", "jpeg", "png", "heic", "raw", "arw", "cr2", "nef", "dng", "mp4", "mov", "m4v", "mts", "mxf"]
-        guard likelyMedia.contains(ext) else { return nil }
+        guard MediaTypes.allExts.contains(url.pathExtension.lowercased()) else { return nil }
         
         let req = QLThumbnailGenerator.Request(fileAt: url, size: size, scale: 1.0, representationTypes: .thumbnail)
         

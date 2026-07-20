@@ -180,7 +180,6 @@ final class ImportViewModel: ObservableObject {
     
     func scanForCandidates() {
         log("Scanning volumes…")
-        log("Scanning volumes…")
         candidates = []
         disabledCandidates = []
         progress = 0
@@ -253,39 +252,64 @@ final class ImportViewModel: ObservableObject {
             return
         }
 
+        // Free-space preflight: refuse to start an import that cannot fit.
+        if !options.dryRun, let info = getStorageInfo(for: destRoot) {
+            let needed = pendingImportSize
+            if info.available < needed {
+                log("❗️ Not enough space on destination: need \(formatBytes(Double(needed))), only \(formatBytes(Double(info.available))) available. Import aborted.")
+                return
+            }
+        }
+
         isImporting = true
         defer { isImporting = false }
-        
+
         let total = max(candidates.count, 1)
         var importedCount = 0
+        var failedFiles: [String] = []
         var importedPhotoPaths: [URL] = []
         var importedVideoPaths: [URL] = []
-        
+
         let totalBytes = candidates.filter { !disabledCandidates.contains($0.id) }.reduce(0) { $0 + $1.fileSize }
         var completedBytes: UInt64 = 0
         let startTime = Date()
-        
+
         self.currentTransferSpeed = ""
         self.estimatedTimeRemaining = ""
-        
+
         importTask = Task { @MainActor in
             for (idx, c) in candidates.enumerated() {
                 if Task.isCancelled {
                     self.log("⚠️ Import cancelled by user.")
                     break
                 }
-                
-                self.progress = Double(idx) / Double(total)
-                
+
+                if totalBytes > 0 {
+                    self.progress = Double(completedBytes) / Double(totalBytes)
+                } else {
+                    self.progress = Double(idx) / Double(total)
+                }
+
                 if disabledCandidates.contains(c.id) {
                     continue
                 }
-                
-                let destURL = buildDestination(for: c, root: destRoot)
+
+                var destURL = buildDestination(for: c, root: destRoot)
 
                 if FileManager.default.fileExists(atPath: destURL.path) {
-                    self.log("⤵︎ Skipping existing: \(destURL.lastPathComponent)")
-                    continue
+                    // Same name + same size: almost certainly the same file — skip it.
+                    // Same name but different size is a different file (cameras recycle
+                    // names after formatting), so import it under a suffixed name
+                    // instead of silently dropping it.
+                    let existingSize = (try? FileManager.default.attributesOfItem(atPath: destURL.path)[.size] as? NSNumber)?.uint64Value
+                    if existingSize == c.fileSize {
+                        self.log("⤵︎ Skipping existing: \(destURL.lastPathComponent)")
+                        completedBytes += c.fileSize
+                        continue
+                    } else {
+                        destURL = resolveCollision(for: destURL)
+                        self.log("⚠️ Name taken by a different file — importing as \(destURL.lastPathComponent)")
+                    }
                 }
 
                 if options.dryRun {
@@ -325,12 +349,12 @@ final class ImportViewModel: ObservableObject {
                             }
                         }
                     }.value
-                    self.log("✅ Imported: \(destURL.lastPathComponent)")
+                    let verified = currentOptions.verifyAfterCopy || currentOptions.moveInsteadOfCopy
+                    self.log(verified ? "✅ Imported & verified: \(destURL.lastPathComponent)" : "✅ Imported: \(destURL.lastPathComponent)")
                     importedCount += 1
                     completedBytes += c.fileSize
-                    
-                    let ext = destURL.pathExtension.lowercased()
-                    if ["mp4", "mov", "mxf", "mts", "m4v"].contains(ext) {
+
+                    if MediaTypes.isVideoExtension(destURL) {
                         importedVideoPaths.append(destURL)
                     } else {
                         importedPhotoPaths.append(destURL)
@@ -338,10 +362,10 @@ final class ImportViewModel: ObservableObject {
                 } catch is CancellationError {
                     self.log("⚠️ Import cancelled by user.")
                     break
-                } catch let error as ImporterError {
-                    self.log("❌ Error importing \(c.url.lastPathComponent): \(error.localizedDescription)")
                 } catch {
                     self.log("❌ Error importing \(c.url.lastPathComponent): \(error.localizedDescription)")
+                    failedFiles.append(c.url.lastPathComponent)
+                    completedBytes += c.fileSize
                 }
             }
 
@@ -349,15 +373,30 @@ final class ImportViewModel: ObservableObject {
             self.currentTransferSpeed = ""
             self.estimatedTimeRemaining = ""
             self.log("Done. Imported \(importedCount)/\(candidates.count).")
-            
+            if !failedFiles.isEmpty {
+                self.log("❌ \(failedFiles.count) file(s) failed: \(failedFiles.joined(separator: ", "))")
+            }
+
             if importedCount > 0 && !options.dryRun {
                 self.lastImportDate = Date().timeIntervalSince1970
             }
 
             if options.ejectAfterImport && !options.dryRun && !Task.isCancelled {
-                for vol in removableVolumes {
-                    importer.ejectVolume(url: vol)
-                    self.log("🔌 Ejected: \(vol.lastPathComponent)")
+                if failedFiles.isEmpty {
+                    for vol in removableVolumes {
+                        let name = vol.lastPathComponent
+                        importer.ejectVolume(url: vol) { error in
+                            Task { @MainActor [weak self] in
+                                if let error {
+                                    self?.log("❗️ Eject failed for \(name): \(error.localizedDescription) — don't remove the card yet.")
+                                } else {
+                                    self?.log("🔌 Ejected: \(name)")
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    self.log("⚠️ Skipping eject because some files failed to import.")
                 }
             }
             
@@ -386,6 +425,22 @@ final class ImportViewModel: ObservableObject {
         await importTask?.value
     }
     
+    /// Finds a destination name that isn't taken, by appending _1, _2, … before the extension.
+    private func resolveCollision(for url: URL) -> URL {
+        let dir = url.deletingLastPathComponent()
+        let base = url.deletingPathExtension().lastPathComponent
+        let ext = url.pathExtension
+        var i = 1
+        while true {
+            let name = ext.isEmpty ? "\(base)_\(i)" : "\(base)_\(i).\(ext)"
+            let candidate = dir.appending(path: name)
+            if !FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+            i += 1
+        }
+    }
+
     private func deepestCommonFolder(for urls: [URL]) -> URL? {
         guard let first = urls.first else { return nil }
         var common = first.deletingLastPathComponent().pathComponents
@@ -517,18 +572,8 @@ final class ImportViewModel: ObservableObject {
         customDropdownBucketsJSON = try? JSONEncoder().encode(dropdownBuckets)
     }
 
-    private func isVideoFile(_ url: URL) -> Bool {
-        let p = url.path.lowercased()
-        let isHyperlapse = p.contains("hyperlapse") || p.contains("timelapse")
-        let isPano = p.contains("panorama") || p.contains("pano")
-        
-        let ext = url.pathExtension.lowercased()
-        let videoExts = ["mp4", "mov", "mxf", "mts", "m4v"]
-        return isHyperlapse ? true : (isPano ? false : videoExts.contains(ext))
-    }
-
     private func cameraBucket(for c: ImportCandidate) -> String {
-        let isVideo = isVideoFile(c.url)
+        let isVideo = MediaTypes.isVideoCategory(c.url)
         var customBase: String? = nil
         
         if let root = getVolumeRootPath(for: c.url) {
@@ -578,7 +623,12 @@ final class ImportViewModel: ObservableObject {
         }
         
         var url = root.standardizedFileURL
-        let existing = Set(url.pathComponents.map { $0.lowercased() })
+        // Skip template segments the user's chosen destination already ends with
+        // (e.g. dest ".../Footage/A7C" with template "{Camera}/..." shouldn't nest
+        // another "A7C"). Only the trailing components are considered — matching
+        // anywhere in the path would let an unrelated ancestor folder swallow a
+        // template level.
+        let existing = Set(url.pathComponents.suffix(desired.count).map { $0.lowercased() })
 
         for seg in desired {
             if !existing.contains(seg.lowercased()) {

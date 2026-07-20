@@ -1,14 +1,12 @@
 import Foundation
+import ImageIO
 
 /// A service responsible for recursively scanning volumes for media files and identifying valid SD cards.
 struct FileScanningService: Sendable {
     let fm = FileManager.default
-    
+
     // Allowed extensions for all media
-    let allowedExts: Set<String> = [
-        "mp4", "mov", "mxf", "mts", "m4v", // Videos
-        "arw", "jpg", "jpeg", "heic", "dng", "png" // Photos
-    ]
+    let allowedExts: Set<String> = MediaTypes.allExts
     
     /// Determines if a mounted volume is likely a camera SD card by checking for standard directory structures.
     /// - Parameter vol: The root URL of the volume.
@@ -151,16 +149,59 @@ struct FileScanningService: Sendable {
             if vals.isHidden == true { return false }
         }
         let name = url.lastPathComponent.lowercased()
-        if name.hasSuffix(".lrv") || name.hasSuffix(".lrf") || name.hasSuffix(".thm") || name.contains("_t") {
+        // Exclude low-res proxy/thumbnail companions: .LRV/.LRF/.THM files and
+        // names ending in "_t" before the extension (e.g. "DJI_0001_T.JPG").
+        // Match only the suffix — a bare `contains("_t")` would reject legitimate
+        // files like "IMG_test.jpg".
+        let base = url.deletingPathExtension().lastPathComponent.lowercased()
+        if name.hasSuffix(".lrv") || name.hasSuffix(".lrf") || name.hasSuffix(".thm") || base.hasSuffix("_t") {
             return false
         }
         return allowedExts.contains(url.pathExtension.lowercased())
     }
 
     private func appendCandidate(url: URL, into arr: inout [ImportCandidate]) {
-        let d = (try? url.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
-        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { UInt64($0) } ?? 0
+        let vals = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey, .fileSizeKey])
+        // Prefer the real capture date from EXIF (card filesystem timestamps are
+        // unreliable), then filesystem dates. Distant past beats Date() as a last
+        // resort so an undated file can't silently land in today's folder.
+        let d = exifCaptureDate(for: url)
+            ?? vals?.creationDate
+            ?? vals?.contentModificationDate
+            ?? Date.distantPast
+        let size = (vals?.fileSize).flatMap { UInt64($0) } ?? 0
         arr.append(ImportCandidate(url: url, date: d, fileSize: size))
+    }
+
+    /// Reads the EXIF capture date (DateTimeOriginal) from a photo's header.
+    /// Returns nil for videos and files without EXIF data.
+    private func exifCaptureDate(for url: URL) -> Date? {
+        guard MediaTypes.photoExts.contains(url.pathExtension.lowercased()) else { return nil }
+        let opts = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, opts),
+              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, opts) as? [CFString: Any],
+              let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any],
+              let dateString = (exif[kCGImagePropertyExifDateTimeOriginal] ?? exif[kCGImagePropertyExifDateTimeDigitized]) as? String
+        else { return nil }
+        return Self.parseExifDate(dateString)
+    }
+
+    /// Parses the EXIF date format "yyyy:MM:dd HH:mm:ss" (camera-local time).
+    /// Manual parsing avoids sharing a non-Sendable DateFormatter across threads.
+    private static func parseExifDate(_ s: String) -> Date? {
+        let parts = s.split(separator: " ")
+        guard parts.count == 2 else { return nil }
+        let d = parts[0].split(separator: ":")
+        let t = parts[1].split(separator: ":")
+        guard d.count == 3, t.count == 3,
+              let year = Int(d[0]), let month = Int(d[1]), let day = Int(d[2]),
+              let hour = Int(t[0]), let minute = Int(t[1]), let second = Int(t[2]),
+              year > 1970
+        else { return nil }
+        var comps = DateComponents()
+        comps.year = year; comps.month = month; comps.day = day
+        comps.hour = hour; comps.minute = minute; comps.second = second
+        return Calendar(identifier: .gregorian).date(from: comps)
     }
     
     /// Identifies all currently mounted removable volumes that match the signature of a camera SD card.

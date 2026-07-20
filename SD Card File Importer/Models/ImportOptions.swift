@@ -15,6 +15,9 @@ struct ImportOptions {
     
     var dryRun: Bool = true
     var moveInsteadOfCopy: Bool = false
+    /// Re-read each copied file from the destination (uncached) and compare its
+    /// SHA-256 hash against the source. Moves always verify regardless of this flag.
+    var verifyAfterCopy: Bool = false
     var ejectAfterImport: Bool = false
     var openDestinationWhenDone: Bool = true
     var folderTemplate: String = "{Camera}/{YYYY}/{MM}/{DD}"

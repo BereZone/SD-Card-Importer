@@ -121,9 +121,29 @@ struct OptionsCard: View {
                 .toggleStyle(.switch)
                 .tint(.warningOrange)
                 .lineLimit(1)
-                
+
                 Divider()
-                
+
+                Toggle(isOn: options.moveInsteadOfCopy ? .constant(true) : $options.verifyAfterCopy) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.shield.fill")
+                            .foregroundColor((options.verifyAfterCopy || options.moveInsteadOfCopy) ? .successGreen : .secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Verify After Copy")
+                                .font(.system(.body, design: .rounded).weight(.medium))
+                            Text(options.moveInsteadOfCopy ? "Always on when moving files" : "Re-read copies to confirm integrity (slower)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(.successGreen)
+                .lineLimit(1)
+                .disabled(options.moveInsteadOfCopy)
+
+                Divider()
+
                 Toggle(isOn: $options.ejectAfterImport) {
                     HStack(spacing: 8) {
                         Image(systemName: "eject.circle.fill")
