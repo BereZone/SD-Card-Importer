@@ -1,9 +1,9 @@
 import Foundation
 
-struct ImportOptions {
+struct ImportOptions: Codable {
 
-    
-    enum DateFilter: String, CaseIterable, Identifiable {
+
+    enum DateFilter: String, CaseIterable, Identifiable, Codable {
         case all = "All Time"
         case sinceLastImport = "Since Last Import"
         case today = "Today"

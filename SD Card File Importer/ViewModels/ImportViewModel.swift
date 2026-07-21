@@ -24,7 +24,10 @@ final class ImportViewModel: ObservableObject {
     @Published var debugScan: Bool = false
     
     // User Settings
-    @Published var options = ImportOptions()
+    @AppStorage("importOptionsJSON") var importOptionsJSON: Data?
+    @Published var options = ImportOptions() {
+        didSet { saveOptions() }
+    }
     @Published var sessionIgnoredPaths = Set<String>()
     @Published var disabledCandidates = Set<UUID>()
     
@@ -71,6 +74,7 @@ final class ImportViewModel: ObservableObject {
     private var observers: [NSObjectProtocol] = []
     
     init() {
+        loadOptions()
         loadCustomBuckets()
         observeMounts()
         
@@ -272,7 +276,14 @@ final class ImportViewModel: ObservableObject {
 
         let totalBytes = candidates.filter { !disabledCandidates.contains($0.id) }.reduce(0) { $0 + $1.fileSize }
         var completedBytes: UInt64 = 0
-        let startTime = Date()
+
+        // Rolling window of (timestamp, cumulative bytes) samples, used to compute
+        // transfer speed over the last few seconds rather than averaged since the
+        // import started. This makes the readout track reality when speed changes
+        // mid-import (e.g. a slow file after a run of fast ones), instead of
+        // dragging out a stale average.
+        let speedWindow: TimeInterval = 5.0
+        var speedSamples: [(time: Date, bytes: Double)] = []
 
         self.currentTransferSpeed = ""
         self.estimatedTimeRemaining = ""
@@ -333,17 +344,27 @@ final class ImportViewModel: ObservableObject {
                                     self.progress = (Double(idx) + byteProgress) / Double(total)
                                 }
                                 
-                                let elapsed = Date().timeIntervalSince(startTime)
-                                if elapsed > 1.0 && totalBytes > 0 {
-                                    let bytesPerSec = totalCopied / elapsed
-                                    self.currentTransferSpeed = self.formatBytes(bytesPerSec) + "/s"
-                                    
-                                    let remainingBytes = Double(totalBytes) - totalCopied
-                                    if remainingBytes > 0 {
-                                        let secondsRemaining = remainingBytes / bytesPerSec
-                                        self.estimatedTimeRemaining = self.formatTime(secondsRemaining)
-                                    } else {
-                                        self.estimatedTimeRemaining = "Finishing..."
+                                if totalBytes > 0 {
+                                    let now = Date()
+                                    speedSamples.append((now, totalCopied))
+                                    let cutoff = now.addingTimeInterval(-speedWindow)
+                                    while speedSamples.count > 1, speedSamples[0].time < cutoff {
+                                        speedSamples.removeFirst()
+                                    }
+
+                                    if let oldest = speedSamples.first {
+                                        let dt = now.timeIntervalSince(oldest.time)
+                                        if dt > 0.5 {
+                                            let bytesPerSec = (totalCopied - oldest.bytes) / dt
+                                            self.currentTransferSpeed = self.formatBytes(bytesPerSec) + "/s"
+
+                                            let remainingBytes = Double(totalBytes) - totalCopied
+                                            if remainingBytes > 0 && bytesPerSec > 0 {
+                                                self.estimatedTimeRemaining = self.formatTime(remainingBytes / bytesPerSec)
+                                            } else if remainingBytes <= 0 {
+                                                self.estimatedTimeRemaining = "Finishing..."
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -540,6 +561,19 @@ final class ImportViewModel: ObservableObject {
         log("Set custom videos bucket for \(url.lastPathComponent) to '\(bucket)'")
     }
     
+    // MARK: - Options Persistence
+
+    private func loadOptions() {
+        guard let data = importOptionsJSON,
+              let decoded = try? JSONDecoder().decode(ImportOptions.self, from: data)
+        else { return }
+        options = decoded
+    }
+
+    private func saveOptions() {
+        importOptionsJSON = try? JSONEncoder().encode(options)
+    }
+
     private func loadCustomBuckets() {
         if let dataPhotos = customSourceBucketsPhotosJSON {
             customBucketsPhotos = (try? JSONDecoder().decode([String: String].self, from: dataPhotos)) ?? [:]
