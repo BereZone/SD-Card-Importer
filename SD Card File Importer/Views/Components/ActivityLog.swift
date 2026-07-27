@@ -29,15 +29,21 @@ struct ActivityLogSection: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: CGFloat(3 - (32 - uiThumbnailSize)/6)) {
-                        ForEach(Array(vm.logLines.enumerated()), id: \.offset) { i, line in
-                            logLineView(line: line, index: i)
+                        // `LogEntry` carries its own stable id, so this no longer
+                        // materializes an enumerated copy of the whole log on every
+                        // append, and trimming old lines doesn't renumber the rest.
+                        ForEach(vm.logLines) { entry in
+                            logLineView(entry: entry)
                         }
                     }
                 }
                 .frame(maxHeight: .infinity)
-                .onChange(of: vm.logLines) { _, _ in
+                // Watching the count rather than the array avoids an O(n) element-wise
+                // comparison per appended line, which made a long import O(n²).
+                .onChange(of: vm.logLines.count) { _, _ in
+                    guard let lastID = vm.logLines.last?.id else { return }
                     withAnimation {
-                        proxy.scrollTo(max(0, vm.logLines.count - 1), anchor: .bottom)
+                        proxy.scrollTo(lastID, anchor: .bottom)
                     }
                 }
             }
@@ -45,7 +51,8 @@ struct ActivityLogSection: View {
         .modernCard(accentColor: .accentPrimary)
     }
 
-    private func logLineView(line: String, index: Int) -> some View {
+    private func logLineView(entry: LogEntry) -> some View {
+        let line = entry.text
         let icon: String
         let color: Color
         if line.contains("✅") {
@@ -72,7 +79,7 @@ struct ActivityLogSection: View {
                 .font(.system(uiThumbnailSize < 28 ? .caption2 : .caption, design: .monospaced))
                 .foregroundColor(.primary)
         }
-        .id(index)
+        .id(entry.id)
         .padding(.vertical, CGFloat(2 - (32 - uiThumbnailSize)/6))
     }
 }

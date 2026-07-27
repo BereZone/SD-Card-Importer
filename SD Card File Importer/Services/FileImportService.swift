@@ -1,4 +1,5 @@
 import Foundation
+import Dispatch
 import CryptoKit
 
 /// Custom errors thrown during the file importing process.
@@ -31,7 +32,9 @@ struct FileImportService: Sendable {
     ///
     /// This method reads the file in 1MB chunks to minimize memory usage, allowing the
     /// copying of extremely large files (e.g. 50GB videos) without crashing the app.
-    /// It periodically yields to the cooperative thread pool by calling `Task.checkCancellation()`.
+    /// Each chunk is handled inside its own autorelease pool, and both file descriptors
+    /// bypass the page cache, so the resident set stays flat for the whole copy rather
+    /// than growing with the file.
     /// The source stream is hashed as it passes through (effectively free — the copy is
     /// bottlenecked on card I/O) and the byte count is checked against the source size.
     ///
@@ -58,35 +61,73 @@ struct FileImportService: Sendable {
             }
             defer { try? outHandle.close() }
 
+            // Neither side of a card import benefits from the page cache: the source
+            // is read exactly once, and the destination is only re-read by
+            // `verifyFile`, which sets F_NOCACHE itself. Without this, a 50GB import
+            // parks 50GB of pages in the kernel's cache — memory that shows up as
+            // never coming back after an import, and that evicts whatever the user
+            // actually had cached.
+            _ = fcntl(inHandle.fileDescriptor, F_NOCACHE, 1)
+            _ = fcntl(outHandle.fileDescriptor, F_NOCACHE, 1)
+
             let attrs = try? fm.attributesOfItem(atPath: src.path)
             let totalSize = (attrs?[.size] as? NSNumber)?.uint64Value ?? 0
             var bytesCopied: UInt64 = 0
             var hasher = SHA256()
 
+            // Progress is throttled at the source. The caller hops to the main actor
+            // on every callback, so one callback per 1MB chunk means ~50,000 queued
+            // main-actor jobs on a 50GB import — each retaining its captured closure
+            // until it runs. Emitting on a 0.5%-or-100ms edge keeps the bar smooth
+            // while bounding that queue.
+            var lastReportedFraction = 0.0
+            var lastReportTime = DispatchTime.now()
+            let minFractionStep = 0.005
+            let minReportInterval: UInt64 = 100 * NSEC_PER_MSEC
+
             while true {
                 try Task.checkCancellation()
 
-                let chunk: Data?
-                do {
-                    chunk = try inHandle.read(upToCount: 1024 * 1024)
-                } catch {
-                    throw ImporterError.readFailed(path: src.path)
-                }
+                // One pool per chunk. The loop body has no suspension point, so a
+                // whole file's worth of autoreleased read buffers would otherwise
+                // accumulate in a single pool until the copy finished.
+                let more = try autoreleasepool { () -> Bool in
+                    let chunk: Data?
+                    do {
+                        chunk = try inHandle.read(upToCount: 1024 * 1024)
+                    } catch {
+                        throw ImporterError.readFailed(path: src.path)
+                    }
 
-                guard let chunkData = chunk, !chunkData.isEmpty else {
-                    break // EOF
-                }
+                    guard let chunkData = chunk, !chunkData.isEmpty else {
+                        return false // EOF
+                    }
 
-                do {
-                    try outHandle.write(contentsOf: chunkData)
+                    do {
+                        try outHandle.write(contentsOf: chunkData)
+                    } catch {
+                        throw ImporterError.writeFailed(path: dst.path)
+                    }
+
                     hasher.update(data: chunkData)
                     bytesCopied += UInt64(chunkData.count)
-                    if totalSize > 0 {
-                        onProgress?(Double(bytesCopied) / Double(totalSize))
+
+                    if totalSize > 0, let onProgress {
+                        let fraction = Double(bytesCopied) / Double(totalSize)
+                        let now = DispatchTime.now()
+                        let elapsed = now.uptimeNanoseconds - lastReportTime.uptimeNanoseconds
+                        if fraction >= 1.0
+                            || (fraction - lastReportedFraction >= minFractionStep
+                                && elapsed >= minReportInterval) {
+                            lastReportedFraction = fraction
+                            lastReportTime = now
+                            onProgress(fraction)
+                        }
                     }
-                } catch {
-                    throw ImporterError.writeFailed(path: dst.path)
+                    return true
                 }
+
+                if !more { break }
             }
 
             if totalSize > 0 && bytesCopied != totalSize {
@@ -119,14 +160,20 @@ struct FileImportService: Sendable {
         var hasher = SHA256()
         while true {
             try Task.checkCancellation()
-            let chunk: Data?
-            do {
-                chunk = try handle.read(upToCount: 1024 * 1024)
-            } catch {
-                throw ImporterError.readFailed(path: url.path)
+            // Pool per chunk, for the same reason as `copyFile`: no suspension point
+            // in the loop means one pool would otherwise span the whole file.
+            let more = try autoreleasepool { () -> Bool in
+                let chunk: Data?
+                do {
+                    chunk = try handle.read(upToCount: 1024 * 1024)
+                } catch {
+                    throw ImporterError.readFailed(path: url.path)
+                }
+                guard let chunkData = chunk, !chunkData.isEmpty else { return false }
+                hasher.update(data: chunkData)
+                return true
             }
-            guard let chunkData = chunk, !chunkData.isEmpty else { break }
-            hasher.update(data: chunkData)
+            if !more { break }
         }
 
         guard hasher.finalize() == expected else {

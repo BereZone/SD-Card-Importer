@@ -2,10 +2,23 @@ import SwiftUI
 import Combine
 import os
 
+/// One line in the Activity Log. The monotonic `id` keeps row identity stable when
+/// old lines are trimmed off the front, so trimming doesn't invalidate every row.
+struct LogEntry: Identifiable, Equatable {
+    let id: Int
+    let text: String
+}
+
 @MainActor
 final class ImportViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.berezone.sdcardimporter", category: "ViewModel")
-    
+
+    /// Upper bound on retained log lines. An import appends one line per file, so
+    /// without a cap a large card leaves thousands of strings alive for the rest of
+    /// the session — and the log view's per-append work grows with them.
+    private static let maxLogLines = 2000
+    private var nextLogID = 0
+
     // Services
     private let permissionService = PermissionService.shared
     private let scanner = FileScanningService()
@@ -16,7 +29,7 @@ final class ImportViewModel: ObservableObject {
     // State
     @Published var removableVolumes: [URL] = []
     @Published var candidates: [ImportCandidate] = []
-    @Published var logLines: [String] = []
+    @Published var logLines: [LogEntry] = []
     @Published var isImporting: Bool = false
     @Published var progress: Double = 0
     @Published var currentTransferSpeed: String = ""
@@ -106,9 +119,8 @@ final class ImportViewModel: ObservableObject {
             }
         }
         
-        candidates = []
-        disabledCandidates = []
-        
+        clearCandidates()
+
         var results: [URL] = permissionService.restoreSourceBookmarks()
         
         let destRoot = destinationVolumeRoot()
@@ -182,10 +194,18 @@ final class ImportViewModel: ObservableObject {
         }
     }
     
-    func scanForCandidates() {
-        log("Scanning volumes…")
+    /// Drops the candidate list and the thumbnails rendered for it. The thumbnail
+    /// cache is keyed by file URL, so without this an ejected or rescanned card's
+    /// bitmaps stay resident with nothing on screen referencing them.
+    private func clearCandidates() {
         candidates = []
         disabledCandidates = []
+        Task { await ThumbnailService.shared.clear() }
+    }
+
+    func scanForCandidates() {
+        log("Scanning volumes…")
+        clearCandidates()
         progress = 0
         let vols = removableVolumes
         let totalVols = max(vols.count, 1)
@@ -271,8 +291,11 @@ final class ImportViewModel: ObservableObject {
         let total = max(candidates.count, 1)
         var importedCount = 0
         var failedFiles: [String] = []
-        var importedPhotoPaths: [URL] = []
-        var importedVideoPaths: [URL] = []
+        // Folded as we go rather than collecting every imported URL — the arrays were
+        // only ever reduced to a common ancestor at the end, so holding one path per
+        // imported file until then was pure accumulation.
+        var photoCommonDir: [String]? = nil
+        var videoCommonDir: [String]? = nil
 
         let totalBytes = candidates.filter { !disabledCandidates.contains($0.id) }.reduce(0) { $0 + $1.fileSize }
         var completedBytes: UInt64 = 0
@@ -376,9 +399,9 @@ final class ImportViewModel: ObservableObject {
                     completedBytes += c.fileSize
 
                     if MediaTypes.isVideoExtension(destURL) {
-                        importedVideoPaths.append(destURL)
+                        videoCommonDir = self.mergeCommonFolder(videoCommonDir, with: destURL)
                     } else {
-                        importedPhotoPaths.append(destURL)
+                        photoCommonDir = self.mergeCommonFolder(photoCommonDir, with: destURL)
                     }
                 } catch is CancellationError {
                     self.log("⚠️ Import cancelled by user.")
@@ -424,11 +447,11 @@ final class ImportViewModel: ObservableObject {
             if options.openDestinationWhenDone && !options.dryRun && !Task.isCancelled {
                 var dirsToOpen = Set<URL>()
                 
-                if let pd = self.deepestCommonFolder(for: importedPhotoPaths) {
+                if let pd = self.folderURL(from: photoCommonDir) {
                     dirsToOpen.insert(pd)
                 }
-                
-                if let vd = self.deepestCommonFolder(for: importedVideoPaths) {
+
+                if let vd = self.folderURL(from: videoCommonDir) {
                     dirsToOpen.insert(vd)
                 }
                 
@@ -444,6 +467,11 @@ final class ImportViewModel: ObservableObject {
         }
         
         await importTask?.value
+
+        // Release the finished task (it captures `self` and the whole import closure)
+        // and drop the speed window, so nothing from the run outlives it.
+        importTask = nil
+        speedSamples = []
     }
     
     /// Finds a destination name that isn't taken, by appending _1, _2, … before the extension.
@@ -462,29 +490,27 @@ final class ImportViewModel: ObservableObject {
         }
     }
 
-    private func deepestCommonFolder(for urls: [URL]) -> URL? {
-        guard let first = urls.first else { return nil }
-        var common = first.deletingLastPathComponent().pathComponents
-        
-        for url in urls.dropFirst() {
-            let dir = url.deletingLastPathComponent().pathComponents
-            let minLen = min(common.count, dir.count)
-            var newCommon: [String] = []
-            for i in 0..<minLen {
-                if common[i] == dir[i] {
-                    newCommon.append(common[i])
-                } else {
-                    break
-                }
+    /// Narrows a running common-ancestor path to also cover `url`'s directory.
+    /// `nil` means "nothing folded in yet", so the first file seeds the ancestor.
+    private func mergeCommonFolder(_ current: [String]?, with url: URL) -> [String] {
+        let dir = url.deletingLastPathComponent().pathComponents
+        guard let current else { return dir }
+
+        var merged: [String] = []
+        for i in 0..<min(current.count, dir.count) {
+            if current[i] == dir[i] {
+                merged.append(current[i])
+            } else {
+                break
             }
-            common = newCommon
-            if common.isEmpty { break }
         }
-        
-        guard !common.isEmpty else { return nil }
-        
+        return merged
+    }
+
+    private func folderURL(from components: [String]?) -> URL? {
+        guard let components, !components.isEmpty else { return nil }
         var result = URL(fileURLWithPath: "/")
-        for comp in common where comp != "/" {
+        for comp in components where comp != "/" {
             result.append(path: comp)
         }
         return result
@@ -799,10 +825,18 @@ final class ImportViewModel: ObservableObject {
         observers = [didMount, didUnmount]
     }
     
+    /// Appends to the Activity Log, trimming the oldest lines past the cap.
+    ///
+    /// The whole type is `@MainActor`, so every caller is already main-isolated and
+    /// the append happens inline. It used to hop through a `Task { @MainActor }`,
+    /// which allocated a task per line and let log lines land out of order relative
+    /// to the state changes they describe.
     private func log(_ s: String) {
         logger.info("\(s, privacy: .public)")
-        Task { @MainActor in
-            self.logLines.append(s)
+        logLines.append(LogEntry(id: nextLogID, text: s))
+        nextLogID += 1
+        if logLines.count > Self.maxLogLines {
+            logLines.removeFirst(logLines.count - Self.maxLogLines)
         }
     }
 }
