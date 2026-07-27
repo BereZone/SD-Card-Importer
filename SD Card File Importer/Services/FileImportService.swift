@@ -51,22 +51,32 @@ nonisolated struct FileImportService: Sendable {
     /// Sized against real hardware, not picked arbitrarily. `F_NOCACHE` disables
     /// kernel readahead, so every read is a synchronous round-trip to the card
     /// with nothing prefetched; the smaller the request, the more of each round
-    /// trip is latency rather than transfer. Measured on a UHS-II V60 card
-    /// copying a 321 MB clip to internal SSD, warmed up, median of two passes:
+    /// trip is latency rather than transfer. That latency stays on the critical
+    /// path even with the write pipelining below, which overlaps reads with
+    /// writes but not reads with other reads.
     ///
-    ///      1 MB  204 MB/s        8 MB  238 MB/s
-    ///      2 MB  226 MB/s       16 MB  241 MB/s
-    ///      4 MB  239 MB/s
+    /// Measured on a UHS-II V60 card, 321 MB clip, warmed up, pipelined —
+    /// i.e. the configuration this code actually ships:
+    ///
+    ///                 to exFAT   to APFS
+    ///      1 MB        217        216 MB/s
+    ///      2 MB        235        235 MB/s
+    ///      4 MB        245        245 MB/s
+    ///      8 MB        245        246 MB/s
+    ///     16 MB        245        247 MB/s
     ///
     /// Reference points on the same card: `cp` 244 MB/s, `ditto` 241 MB/s,
-    /// Finder 226 MB/s, and the card itself tops out near 250 MB/s.
+    /// Finder 226 MB/s, card read ceiling near 250 MB/s.
     ///
-    /// Throughput plateaus from 4 MB up, so anything in 4–16 MB is equivalent.
-    /// Do not drop back to 1 MB: that costs about 17% and puts the app below
-    /// Finder. Re-measure against real removable media if changing this — a
-    /// RAM-backed disk image has no device latency and shows no difference at
-    /// all. Measure warmed up, too; the first read from an idle card is far
-    /// slower than steady state and will skew whichever size you test first.
+    /// Throughput plateaus from 4 MB up, so 4–16 MB are equivalent here; 8 MB
+    /// keeps headroom for faster media, where a fixed ~1 ms per request eats a
+    /// larger share of a shorter transfer. Do not drop back to 1 MB — that
+    /// costs about 12% and is not rescued by pipelining.
+    ///
+    /// Re-measure against real removable media if changing this. A RAM-backed
+    /// disk image has no device latency and shows no difference at all, and the
+    /// first read from an idle card is far slower than steady state, so warm up
+    /// or whichever size you test first will look worst.
     static let chunkSize = 8 * 1024 * 1024
 
     // Computed rather than stored: `FileManager.default` is a thread-safe
