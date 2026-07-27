@@ -32,6 +32,29 @@ nonisolated enum ImporterError: Error, LocalizedError {
 /// synchronous, awaiting it from a `Task.detached` would hop straight back to
 /// the main actor and block the UI for the entire duration of every file.
 nonisolated struct FileImportService: Sendable {
+    /// Bytes per read/write in the streaming loops.
+    ///
+    /// Sized against real hardware, not picked arbitrarily. `F_NOCACHE` disables
+    /// kernel readahead, so every read is a synchronous round-trip to the card
+    /// with nothing prefetched; the smaller the request, the more of each round
+    /// trip is latency rather than transfer. Measured on a UHS-II V60 card
+    /// copying a 321 MB clip to internal SSD, warmed up, median of two passes:
+    ///
+    ///      1 MB  204 MB/s        8 MB  238 MB/s
+    ///      2 MB  226 MB/s       16 MB  241 MB/s
+    ///      4 MB  239 MB/s
+    ///
+    /// Reference points on the same card: `cp` 244 MB/s, `ditto` 241 MB/s,
+    /// Finder 226 MB/s, and the card itself tops out near 250 MB/s.
+    ///
+    /// Throughput plateaus from 4 MB up, so anything in 4–16 MB is equivalent.
+    /// Do not drop back to 1 MB: that costs about 17% and puts the app below
+    /// Finder. Re-measure against real removable media if changing this — a
+    /// RAM-backed disk image has no device latency and shows no difference at
+    /// all. Measure warmed up, too; the first read from an idle card is far
+    /// slower than steady state and will skew whichever size you test first.
+    static let chunkSize = 8 * 1024 * 1024
+
     // Computed rather than stored: `FileManager.default` is a thread-safe
     // singleton, but as a stored property it makes this Sendable struct hold a
     // non-Sendable field.
@@ -39,7 +62,7 @@ nonisolated struct FileImportService: Sendable {
 
     /// Copies a single file from the source URL to the destination URL asynchronously.
     ///
-    /// This method reads the file in 1MB chunks to minimize memory usage, allowing the
+    /// This method streams the file in `chunkSize` blocks to keep memory flat, allowing the
     /// copying of extremely large files (e.g. 50GB videos) without crashing the app.
     /// Each chunk is handled inside its own autorelease pool, and both file descriptors
     /// bypass the page cache, so the resident set stays flat for the whole copy rather
@@ -90,8 +113,8 @@ nonisolated struct FileImportService: Sendable {
             var hasher: SHA256? = hashing ? SHA256() : nil
 
             // Progress is throttled at the source. The caller hops to the main actor
-            // on every callback, so one callback per 1MB chunk means ~50,000 queued
-            // main-actor jobs on a 50GB import — each retaining its captured closure
+            // on every callback, so one callback per chunk means thousands of queued
+            // main-actor jobs on a large import — each retaining its captured closure
             // until it runs. Emitting on a 0.5%-or-100ms edge keeps the bar smooth
             // while bounding that queue.
             var lastReportedFraction = 0.0
@@ -108,7 +131,7 @@ nonisolated struct FileImportService: Sendable {
                 let more = try autoreleasepool { () -> Bool in
                     let chunk: Data?
                     do {
-                        chunk = try inHandle.read(upToCount: 1024 * 1024)
+                        chunk = try inHandle.read(upToCount: Self.chunkSize)
                     } catch {
                         throw ImporterError.readFailed(path: src.path)
                     }
@@ -179,7 +202,7 @@ nonisolated struct FileImportService: Sendable {
             let more = try autoreleasepool { () -> Bool in
                 let chunk: Data?
                 do {
-                    chunk = try handle.read(upToCount: 1024 * 1024)
+                    chunk = try handle.read(upToCount: Self.chunkSize)
                 } catch {
                     throw ImporterError.readFailed(path: url.path)
                 }

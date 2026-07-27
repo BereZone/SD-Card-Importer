@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Transfers are faster on fast cards. Files stream in 8 MB blocks rather than
+  1 MB, which on a UHS-II V60 card raises throughput from about 204 MB/s to
+  about 238 MB/s — ahead of Finder, and within a few percent of `cp`.
 - Copies are noticeably faster when verification is off. Every copy was
   checksummed even when nothing read the result, roughly halving throughput on
   fast cards for a value that was discarded. Verified copies and moves between
