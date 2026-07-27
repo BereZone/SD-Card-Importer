@@ -1,6 +1,6 @@
 import Foundation
 
-struct ImportOptions: Codable {
+nonisolated struct ImportOptions: Codable {
 
 
     enum DateFilter: String, CaseIterable, Identifiable, Codable {

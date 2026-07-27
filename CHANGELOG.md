@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The interface no longer freezes while each file is transferred. Copying and
+  scanning ran on the main thread despite being dispatched to background tasks,
+  so the window stopped responding for the duration of every file and only
+  recovered between them.
 - Memory during an import no longer grows with file size. Copy buffers
   accumulated in a single autorelease pool for the duration of each file, so
   peak memory tracked the largest file one-for-one — measured at +2058 MB while

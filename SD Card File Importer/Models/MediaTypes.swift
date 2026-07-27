@@ -3,7 +3,7 @@ import Foundation
 /// Single source of truth for which file extensions the app treats as media,
 /// and for photo/video categorization. Shared by the scanner, importer,
 /// thumbnailer, and camera profiles so the lists can't drift apart.
-enum MediaTypes {
+nonisolated enum MediaTypes {
     static let videoExts: Set<String> = ["mp4", "mov", "mxf", "mts", "m4v"]
 
     static let photoExts: Set<String> = [

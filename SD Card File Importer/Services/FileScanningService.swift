@@ -2,8 +2,11 @@ import Foundation
 import ImageIO
 
 /// A service responsible for recursively scanning volumes for media files and identifying valid SD cards.
-struct FileScanningService: Sendable {
-    let fm = FileManager.default
+nonisolated struct FileScanningService: Sendable {
+    // Computed rather than stored: `FileManager.default` is a thread-safe
+    // singleton, but as a stored property it makes this Sendable struct hold a
+    // non-Sendable field.
+    var fm: FileManager { FileManager.default }
 
     // Allowed extensions for all media
     let allowedExts: Set<String> = MediaTypes.allExts

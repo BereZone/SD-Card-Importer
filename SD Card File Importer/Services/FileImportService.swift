@@ -3,7 +3,7 @@ import Dispatch
 import CryptoKit
 
 /// Custom errors thrown during the file importing process.
-enum ImporterError: Error, LocalizedError {
+nonisolated enum ImporterError: Error, LocalizedError {
     case fileNotFound(path: String)
     case readFailed(path: String)
     case writeFailed(path: String)
@@ -25,8 +25,17 @@ enum ImporterError: Error, LocalizedError {
 }
 
 /// A service responsible for copying or moving files from source media to a destination.
-struct FileImportService: Sendable {
-    let fm = FileManager.default
+///
+/// Explicitly `nonisolated`. The project builds with
+/// `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, so without this the whole type
+/// is implicitly main-actor isolated — and because `copyFile`'s chunk loop is
+/// synchronous, awaiting it from a `Task.detached` would hop straight back to
+/// the main actor and block the UI for the entire duration of every file.
+nonisolated struct FileImportService: Sendable {
+    // Computed rather than stored: `FileManager.default` is a thread-safe
+    // singleton, but as a stored property it makes this Sendable struct hold a
+    // non-Sendable field.
+    var fm: FileManager { FileManager.default }
 
     /// Copies a single file from the source URL to the destination URL asynchronously.
     ///

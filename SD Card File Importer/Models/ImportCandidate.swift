@@ -1,6 +1,6 @@
 import Foundation
 
-struct ImportCandidate: Identifiable {
+nonisolated struct ImportCandidate: Identifiable, Sendable {
     let id = UUID()
     let url: URL
     let date: Date
