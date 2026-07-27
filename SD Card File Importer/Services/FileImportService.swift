@@ -24,6 +24,20 @@ nonisolated enum ImporterError: Error, LocalizedError {
     }
 }
 
+/// Carries the first error from the background write queue back to the read loop.
+private nonisolated final class WriteFailure: @unchecked Sendable {
+    private var stored: Error?
+    private let lock = NSLock()
+    func record(_ error: Error) {
+        lock.lock(); defer { lock.unlock() }
+        if stored == nil { stored = error }
+    }
+    var error: Error? {
+        lock.lock(); defer { lock.unlock() }
+        return stored
+    }
+}
+
 /// A service responsible for copying or moving files from source media to a destination.
 ///
 /// Explicitly `nonisolated`. The project builds with
@@ -83,6 +97,17 @@ nonisolated struct FileImportService: Sendable {
     /// - Throws: `ImporterError.fileNotFound`, `.readFailed`, `.writeFailed`, or `.sizeMismatch`.
     @discardableResult
     func copyFile(from src: URL, to dst: URL, hashing: Bool, onProgress: (@Sendable (Double) -> Void)?) async throws -> SHA256Digest? {
+        try streamCopy(from: src, to: dst, hashing: hashing, onProgress: onProgress)
+    }
+
+    /// The transfer itself, as synchronous blocking work.
+    ///
+    /// Deliberately not `async`: the loop blocks its thread on real I/O from
+    /// start to finish, and the semaphore that applies backpressure to the write
+    /// queue is a blocking primitive, which is unavailable from async contexts.
+    /// Callers reach this through `copyFile`, which the importer already invokes
+    /// on a detached task.
+    private func streamCopy(from src: URL, to dst: URL, hashing: Bool, onProgress: (@Sendable (Double) -> Void)?) throws -> SHA256Digest? {
         guard let inHandle = try? FileHandle(forReadingFrom: src) else {
             throw ImporterError.fileNotFound(path: src.path)
         }
@@ -122,50 +147,78 @@ nonisolated struct FileImportService: Sendable {
             let minFractionStep = 0.005
             let minReportInterval: UInt64 = 100 * NSEC_PER_MSEC
 
+            // Reads and writes overlap. Run serially, the card sits idle for the
+            // whole of every write; handing writes to a background queue keeps it
+            // streaming continuously. Measured on a UHS-II V60 card, 321 MB clip:
+            // to exFAT 192 -> 246 MB/s, to APFS 229 -> 247 MB/s. Both then sit at
+            // the card's read ceiling, which is the most that is available.
+            //
+            // Depth 2 is enough — depth 4 measured identically — and it bounds the
+            // in-flight buffers to about three chunks, so memory stays flat.
+            let writeQueue = DispatchQueue(label: "com.berezone.sdcardimporter.write")
+            let inFlight = DispatchSemaphore(value: 2)
+            let writeFailure = WriteFailure()
+
+            // Declared after the `outHandle` defer, so it unwinds *before* it: no
+            // write can ever be in flight against a closed descriptor, and the
+            // catch below cannot delete the file out from under a pending write.
+            defer { writeQueue.sync {} }
+
             while true {
                 try Task.checkCancellation()
 
-                // One pool per chunk. The loop body has no suspension point, so a
+                // Surface a write failure promptly rather than reading the rest of
+                // the file first.
+                if let failure = writeFailure.error { throw failure }
+
+                // One pool per read. The loop body has no suspension point, so a
                 // whole file's worth of autoreleased read buffers would otherwise
                 // accumulate in a single pool until the copy finished.
-                let more = try autoreleasepool { () -> Bool in
-                    let chunk: Data?
+                let chunk: Data? = try autoreleasepool { () -> Data? in
                     do {
-                        chunk = try inHandle.read(upToCount: Self.chunkSize)
+                        return try inHandle.read(upToCount: Self.chunkSize)
                     } catch {
                         throw ImporterError.readFailed(path: src.path)
                     }
+                }
 
-                    guard let chunkData = chunk, !chunkData.isEmpty else {
-                        return false // EOF
-                    }
+                guard let chunkData = chunk, !chunkData.isEmpty else {
+                    break // EOF
+                }
 
+                // Hashed here rather than on the write queue so chunks are always
+                // digested in file order.
+                hasher?.update(data: chunkData)
+                bytesCopied += UInt64(chunkData.count)
+
+                inFlight.wait()
+                writeQueue.async {
                     do {
                         try outHandle.write(contentsOf: chunkData)
                     } catch {
-                        throw ImporterError.writeFailed(path: dst.path)
+                        writeFailure.record(ImporterError.writeFailed(path: dst.path))
                     }
-
-                    hasher?.update(data: chunkData)
-                    bytesCopied += UInt64(chunkData.count)
-
-                    if totalSize > 0, let onProgress {
-                        let fraction = Double(bytesCopied) / Double(totalSize)
-                        let now = DispatchTime.now()
-                        let elapsed = now.uptimeNanoseconds - lastReportTime.uptimeNanoseconds
-                        if fraction >= 1.0
-                            || (fraction - lastReportedFraction >= minFractionStep
-                                && elapsed >= minReportInterval) {
-                            lastReportedFraction = fraction
-                            lastReportTime = now
-                            onProgress(fraction)
-                        }
-                    }
-                    return true
+                    inFlight.signal()
                 }
 
-                if !more { break }
+                if totalSize > 0, let onProgress {
+                    let fraction = Double(bytesCopied) / Double(totalSize)
+                    let now = DispatchTime.now()
+                    let elapsed = now.uptimeNanoseconds - lastReportTime.uptimeNanoseconds
+                    if fraction >= 1.0
+                        || (fraction - lastReportedFraction >= minFractionStep
+                            && elapsed >= minReportInterval) {
+                        lastReportedFraction = fraction
+                        lastReportTime = now
+                        onProgress(fraction)
+                    }
+                }
             }
+
+            // Every queued write must land before the size check and the digest
+            // are trusted.
+            writeQueue.sync {}
+            if let failure = writeFailure.error { throw failure }
 
             if totalSize > 0 && bytesCopied != totalSize {
                 throw ImporterError.sizeMismatch(path: dst.path, expected: totalSize, actual: bytesCopied)
