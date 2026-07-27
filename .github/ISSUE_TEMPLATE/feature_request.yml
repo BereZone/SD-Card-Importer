@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest a capability or improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: >
+        Describe the situation you hit, not the solution you have in mind.
+        Understanding the workflow usually suggests a better fix than the
+        one first imagined.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like it to do
+    validations:
+      required: true
+
+  - type: input
+    id: camera
+    attributes:
+      label: Camera or card this relates to
+      description: If this is about supporting a specific camera's layout.
+      placeholder: "Blackmagic Pocket 6K, CFexpress Type B"
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead
+      description: The current workaround, if there is one.

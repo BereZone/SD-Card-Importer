@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT: SD Card File Importer.xcodeproj
+  SCHEME: SD Card File Importer
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination "platform=macOS" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      # There is no test target in the Xcode project yet. Rather than fail the
+      # run, detect that and skip -- adding a target in Xcode switches this on
+      # with no workflow change.
+      - name: Detect test target
+        id: detect
+        run: |
+          if xcodebuild -list -project "$PROJECT" -json | grep -q '"[^"]*Tests"'; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No test target in the Xcode project - skipping tests."
+          fi
+
+      - name: Test
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "platform=macOS" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+  conventions:
+    name: Conventions
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Subjects must parse as Conventional Commits. Merge commits are exempt.
+      - name: Check commit subjects
+        run: |
+          RE='^(feat|fix|perf|refactor|docs|test|build|ci|chore|revert)(\([a-z0-9._-]+\))?!?: .+'
+          FAIL=0
+          while read -r sha; do
+            SUBJECT=$(git log -1 --format=%s "$sha")
+            if git log -1 --format=%P "$sha" | grep -q ' '; then
+              continue
+            fi
+            if ! echo "$SUBJECT" | grep -Eq "$RE"; then
+              echo "::error::Not a Conventional Commit: $SUBJECT"
+              FAIL=1
+            fi
+          done < <(git rev-list origin/${{ github.base_ref }}..HEAD)
+          exit $FAIL
+
+      - name: Check changelog was updated
+        run: |
+          if git diff --quiet origin/${{ github.base_ref }}..HEAD -- CHANGELOG.md; then
+            echo "::warning::CHANGELOG.md was not touched. If this change is \
+            user-visible, add an entry under ## [Unreleased]."
+          fi

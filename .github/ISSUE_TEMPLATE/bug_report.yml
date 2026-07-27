@@ -1,0 +1,75 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file this.
+
+        If files were lost or corrupted during an import, say so up front —
+        that gets priority.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Insert a ...
+        2. Set the destination to ...
+        3. Click Import
+        4. ...
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Shown in the About window, or the release you downloaded.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: "14.5"
+    validations:
+      required: true
+
+  - type: input
+    id: camera
+    attributes:
+      label: Camera and card
+      description: Which camera wrote the card, and the card type.
+      placeholder: "Sony A7C, SanDisk Extreme 128GB SDXC"
+
+  - type: textarea
+    id: activity-log
+    attributes:
+      label: Activity Log
+      description: >
+        Relevant lines from the app's Activity Log panel. This is the single
+        most useful thing you can attach.
+      render: text
+
+  - type: checkboxes
+    id: options
+    attributes:
+      label: Import options in use
+      options:
+        - label: Move instead of copy
+        - label: Verify after copy
+        - label: Rename files
+        - label: Eject after import
+        - label: Dry run
