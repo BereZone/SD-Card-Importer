@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Copies are noticeably faster when verification is off. Every copy was
+  checksummed even when nothing read the result, roughly halving throughput on
+  fast cards for a value that was discarded. Verified copies and moves between
+  volumes still checksum, and still refuse to delete a source that has not been
+  confirmed.
 - The thumbnail cache is capped at a 256 MB decoded-bitmap budget and is cleared
   when the file list is replaced, instead of growing until the system forced a
   purge.

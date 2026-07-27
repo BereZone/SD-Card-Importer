@@ -44,17 +44,22 @@ nonisolated struct FileImportService: Sendable {
     /// Each chunk is handled inside its own autorelease pool, and both file descriptors
     /// bypass the page cache, so the resident set stays flat for the whole copy rather
     /// than growing with the file.
-    /// The source stream is hashed as it passes through (effectively free — the copy is
-    /// bottlenecked on card I/O) and the byte count is checked against the source size.
+    /// When `hashing` is set the source stream is digested as it passes through; the
+    /// byte count is always checked against the source size regardless.
+    ///
+    /// Hashing is opt-in because it is not free. Measured on a 2GB file it roughly
+    /// halves throughput (0.70s to 1.34s), which is invisible at SD card speeds but
+    /// very much not on CFexpress. Only ask for a digest when something will read it.
     ///
     /// - Parameters:
     ///   - src: The source URL of the file to copy.
     ///   - dst: The destination URL where the file should be saved.
+    ///   - hashing: Whether to compute a SHA-256 of the source stream.
     ///   - onProgress: An optional closure that is called periodically with the completion percentage (0.0 to 1.0).
-    /// - Returns: The SHA-256 digest of the copied data.
+    /// - Returns: The SHA-256 digest of the copied data, or `nil` when `hashing` is false.
     /// - Throws: `ImporterError.fileNotFound`, `.readFailed`, `.writeFailed`, or `.sizeMismatch`.
     @discardableResult
-    func copyFile(from src: URL, to dst: URL, onProgress: (@Sendable (Double) -> Void)?) async throws -> SHA256Digest {
+    func copyFile(from src: URL, to dst: URL, hashing: Bool, onProgress: (@Sendable (Double) -> Void)?) async throws -> SHA256Digest? {
         guard let inHandle = try? FileHandle(forReadingFrom: src) else {
             throw ImporterError.fileNotFound(path: src.path)
         }
@@ -82,7 +87,7 @@ nonisolated struct FileImportService: Sendable {
             let attrs = try? fm.attributesOfItem(atPath: src.path)
             let totalSize = (attrs?[.size] as? NSNumber)?.uint64Value ?? 0
             var bytesCopied: UInt64 = 0
-            var hasher = SHA256()
+            var hasher: SHA256? = hashing ? SHA256() : nil
 
             // Progress is throttled at the source. The caller hops to the main actor
             // on every callback, so one callback per 1MB chunk means ~50,000 queued
@@ -118,7 +123,7 @@ nonisolated struct FileImportService: Sendable {
                         throw ImporterError.writeFailed(path: dst.path)
                     }
 
-                    hasher.update(data: chunkData)
+                    hasher?.update(data: chunkData)
                     bytesCopied += UInt64(chunkData.count)
 
                     if totalSize > 0, let onProgress {
@@ -146,7 +151,7 @@ nonisolated struct FileImportService: Sendable {
             if let attrs {
                 try? fm.setAttributes(attrs, ofItemAtPath: dst.path)
             }
-            return hasher.finalize()
+            return hasher?.finalize()
         } catch {
             // If the copy was cancelled or failed, clean up the corrupted partial file
             try? fm.removeItem(at: dst)
@@ -192,9 +197,9 @@ nonisolated struct FileImportService: Sendable {
 
     /// Performs the import of a candidate file to its destination directory.
     ///
-    /// Creates intermediate directories if needed. Copies always stream in chunks with
-    /// an inline source hash and size check. If `options.verifyAfterCopy` is set, the
-    /// destination is re-read (uncached) and its hash compared to the source.
+    /// Creates intermediate directories if needed. Copies stream in chunks with a size
+    /// check. If the copy will be verified, the source is also hashed as it streams and
+    /// the destination is then re-read (uncached) and compared.
     ///
     /// Move mode never deletes the source until the destination copy has been fully
     /// verified — a failed verification keeps the source intact and removes the bad
@@ -213,32 +218,42 @@ nonisolated struct FileImportService: Sendable {
             at: destination.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        if options.moveInsteadOfCopy {
-            if isSameVolume(candidate.url, destination.deletingLastPathComponent()) {
-                try fm.moveItem(at: candidate.url, to: destination)
-                onProgress?(1.0)
-                return
-            }
-            // Cross-volume move: copy, verify, then delete the source. The source is
-            // the only copy of the data, so verification here is not optional.
-            let digest = try await copyFile(from: candidate.url, to: destination, onProgress: onProgress)
+
+        // A move within one volume is a rename: no bytes travel, nothing to verify.
+        if options.moveInsteadOfCopy,
+           isSameVolume(candidate.url, destination.deletingLastPathComponent()) {
+            try fm.moveItem(at: candidate.url, to: destination)
+            onProgress?(1.0)
+            return
+        }
+
+        // A cross-volume move deletes the source afterwards, so its copy must be
+        // verified whatever the user asked for. A plain copy only needs a digest if
+        // verification is actually going to read it — hashing a stream nobody checks
+        // costs roughly half the transfer throughput on fast media.
+        let mustVerify = options.moveInsteadOfCopy || options.verifyAfterCopy
+
+        let digest = try await copyFile(
+            from: candidate.url,
+            to: destination,
+            hashing: mustVerify,
+            onProgress: onProgress
+        )
+
+        if mustVerify {
             do {
+                guard let digest else {
+                    throw ImporterError.verificationFailed(path: destination.path)
+                }
                 try await verifyFile(at: destination, matches: digest)
             } catch {
                 try? fm.removeItem(at: destination)
                 throw error
             }
+        }
+
+        if options.moveInsteadOfCopy {
             try fm.removeItem(at: candidate.url)
-        } else {
-            let digest = try await copyFile(from: candidate.url, to: destination, onProgress: onProgress)
-            if options.verifyAfterCopy {
-                do {
-                    try await verifyFile(at: destination, matches: digest)
-                } catch {
-                    try? fm.removeItem(at: destination)
-                    throw error
-                }
-            }
         }
     }
 
