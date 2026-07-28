@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Downloaded builds no longer report as "damaged and can't be opened". The app
+  bundle is now signed, so macOS treats it as an ordinary unsigned download you
+  can allow, rather than a corrupted one it refuses outright.
 - The interface no longer freezes while each file is transferred. Copying and
   scanning ran on the main thread despite being dispatched to background tasks,
   so the window stopped responding for the duration of every file and only

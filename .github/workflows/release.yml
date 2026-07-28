@@ -105,8 +105,15 @@ jobs:
           {
             printf '\n---\n\n'
             printf '### Installing\n\n'
-            printf 'This build is not code-signed, so macOS will refuse to open it the\n'
-            printf 'first time. Right-click the app and choose **Open**, then confirm.\n'
+            printf 'This build is signed ad-hoc rather than with a Developer ID, and is not\n'
+            printf 'notarized, so macOS blocks it on first launch.\n\n'
+            printf 'Move the app to Applications, then either right-click it and choose\n'
+            printf '**Open** and confirm, or run:\n\n'
+            printf '```sh\n'
+            printf 'xattr -dr com.apple.quarantine "/Applications/SD Card File Importer.app"\n'
+            printf '```\n\n'
+            printf 'The command removes the download flag and always works; the right-click\n'
+            printf 'route depends on your Gatekeeper settings.\n'
           } >> release-notes.md
 
           echo "Release notes:"
@@ -128,6 +135,23 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
+
+      # Building with CODE_SIGNING_ALLOWED=NO leaves only the ad-hoc signature the
+      # linker puts on the executable, with no _CodeSignature/CodeResources for the
+      # bundle. Because the bundle does have resources, that signature is
+      # structurally invalid rather than merely untrusted, and macOS reports the
+      # download as "damaged and can't be opened" -- which right-click > Open
+      # cannot bypass. Signing the whole bundle ad-hoc produces a valid signature,
+      # so it degrades to the ordinary unidentified-developer prompt instead.
+      - name: Ad-hoc sign the bundle
+        run: |
+          APP="build/Build/Products/Release/$APP_NAME.app"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          if [ ! -f "$APP/Contents/_CodeSignature/CodeResources" ]; then
+            echo "::error::No CodeResources produced - the bundle signature is still invalid."
+            exit 1
+          fi
 
       - name: Package app
         id: package

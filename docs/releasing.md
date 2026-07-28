@@ -119,12 +119,28 @@ automatically.
 
 ## Code signing
 
-Release builds are unsigned — CI has no access to a signing certificate, so
-Gatekeeper blocks the app on first launch and users have to right-click and
-choose **Open**. The release notes say so.
+CI has no signing certificate, so the workflow signs the bundle **ad-hoc**
+(`codesign --force --deep --sign -`) after building.
 
-To ship signed and notarized builds you would need to add a Developer ID
-certificate, its password, and an App Store Connect API key to repository
+That step is not cosmetic. Building with `CODE_SIGNING_ALLOWED=NO` leaves only
+the ad-hoc signature the linker applies to the executable, with no
+`_CodeSignature/CodeResources` for the bundle. Since the bundle does contain
+resources, that combination is a structurally *invalid* signature rather than a
+merely untrusted one, and macOS reports the download as **"damaged and can't be
+opened"** — which right-click > Open cannot bypass. Signing the whole bundle
+ad-hoc produces a valid signature, so it degrades to the ordinary
+unidentified-developer prompt instead. The workflow fails the release if
+`CodeResources` is missing afterwards.
+
+Ad-hoc signing is still not a Developer ID and still not notarized, so
+Gatekeeper blocks first launch either way. The release notes tell users to run:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/SD Card File Importer.app"
+```
+
+To ship builds that open with no warning at all you would need a Developer ID
+certificate, its password, and an App Store Connect API key in repository
 secrets, then import the certificate into a temporary keychain and run
 `notarytool` after the build. That is a meaningful amount of setup and is not
 currently done.

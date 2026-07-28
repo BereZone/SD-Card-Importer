@@ -18,8 +18,16 @@ macOS 14.0 or later.
 Download the latest build from
 [Releases](https://github.com/BereZone/SD-Card-Importer/releases).
 
-Release builds are not code-signed, so macOS will refuse to open the app on the
-first try. Right-click the app and choose **Open**, then confirm.
+Release builds are signed ad-hoc rather than with a Developer ID, and are not
+notarized, so macOS blocks them on first launch. After moving the app to
+Applications, either right-click it and choose **Open** and confirm, or run:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/SD Card File Importer.app"
+```
+
+The command removes the download flag and always works; the right-click route
+depends on your Gatekeeper settings.
 
 To build from source instead, see [docs/development.md](docs/development.md).
 
