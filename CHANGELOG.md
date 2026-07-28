@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The app version is now shown at the bottom of the sidebar, so you can tell at
+  a glance which build you are running.
+
 ### Fixed
 
 - The interface no longer freezes while each file is transferred. Copying and

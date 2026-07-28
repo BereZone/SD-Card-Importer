@@ -12,24 +12,49 @@ struct SidebarContentView: View {
     @State private var selectedTab: SidebarTab? = .home
     @AppStorage("windowTranslucency") private var windowTranslucency: Bool = true
     
+    /// Read straight from the bundle so it can never drift from what shipped:
+    /// `MARKETING_VERSION` in the Xcode project feeds `CFBundleShortVersionString`.
+    /// The build number is deliberately left out — `CURRENT_PROJECT_VERSION` never
+    /// increments, so it would show a constant "(1)" and tell nobody anything.
+    private var versionLabel: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+        return "v\(version ?? "—")"
+    }
+
     var body: some View {
         NavigationSplitView {
-            List(selection: $selectedTab) {
-                NavigationLink(value: SidebarTab.home) {
-                    Label("Home", systemImage: "house.fill")
+            VStack(spacing: 0) {
+                List(selection: $selectedTab) {
+                    NavigationLink(value: SidebarTab.home) {
+                        Label("Home", systemImage: "house.fill")
+                    }
+
+                    NavigationLink(value: SidebarTab.settings) {
+                        Label("Settings", systemImage: "gearshape.fill")
+                    }
+
+                    NavigationLink(value: SidebarTab.appearance) {
+                        Label("Appearance", systemImage: "paintbrush.fill")
+                    }
                 }
-                
-                NavigationLink(value: SidebarTab.settings) {
-                    Label("Settings", systemImage: "gearshape.fill")
+                .listStyle(.sidebar)
+                .scrollContentBackground(windowTranslucency ? .automatic : .hidden)
+
+                Divider()
+
+                // Selectable so it can be copied straight into a bug report.
+                HStack {
+                    Text(versionLabel)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .textSelection(.enabled)
+                        .help("SD Card File Importer \(versionLabel)")
+                    Spacer()
                 }
-                
-                NavigationLink(value: SidebarTab.appearance) {
-                    Label("Appearance", systemImage: "paintbrush.fill")
-                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
             }
             .navigationTitle("SD Importer")
-            .listStyle(.sidebar)
-            .scrollContentBackground(windowTranslucency ? .automatic : .hidden)
             .background(windowTranslucency ? Color.clear : Color(NSColor.controlBackgroundColor))
         } detail: {
             Group {
