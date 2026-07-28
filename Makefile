@@ -118,7 +118,9 @@ tag: release-check
 	printf "Continue [y/N] "; read ans; \
 	case "$$ans" in [yY]*) ;; *) echo "Aborted."; exit 1;; esac; \
 	NOTES=$$(awk -v v="$$V" '$$0 ~ "^## \\[" v "\\]" {f=1;next} f && (/^## / || /^\[[^]]+\]:/) {f=0} f' '$(CHANGELOG)'); \
-	git tag -a "v$$V" -m "v$$V" -m "$$NOTES"; \
+	printf 'v%s\n\n%s\n' "$$V" "$$NOTES" > .tagmsg.tmp; \
+	git tag -a "v$$V" --cleanup=verbatim -F .tagmsg.tmp; \
+	rm -f .tagmsg.tmp; \
 	echo "Created v$$V. Push it with:"; \
 	echo "  git push --follow-tags"
 
