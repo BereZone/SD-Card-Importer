@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-28
+
 ### Added
 
 - The app version is now shown at the bottom of the sidebar, so you can tell at
@@ -58,5 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release.
 
-[Unreleased]: https://github.com/BereZone/SD-Card-Importer/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/BereZone/SD-Card-Importer/releases/tag/v1.0.0
+[Unreleased]: https://github.com/BereZone/SD-Card-Importer/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/BereZone/SD-Card-Importer/compare/v1.0...v1.1.0
+[1.0.0]: https://github.com/BereZone/SD-Card-Importer/releases/tag/v1.0
