@@ -18,5 +18,10 @@ Pods/
 *.png
 *.jpg
 
+# ...but the app icon assets are build inputs, not screenshots. Without these
+# a CI checkout builds an app with no icon at all.
+!SD Card File Importer/Assets.xcassets/**/*.png
+!sd_card.png
+
 # Optional: API Keys / Sensitive Data (if stored in config files)
 *.xcconfig
