@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Options, History, and Import are now three separate toolbar buttons rather
+  than items that folded into an overflow menu, and Import is filled in the
+  accent colour so it never reads as a peer of the two buttons that just open
+  panels. It turns red when the operation would delete originals, and while an
+  import is running it becomes a red Cancel.
+- Thumbnails keep the shape of their source. Landscape frames are wider than
+  tall and portrait frames are taller than wide, instead of every image being
+  cropped to a square.
+- Verification is off by default again. The indicator light makes its state
+  visible, so the default no longer has to carry that job.
+
+### Added
+
+- An indicator light for checksum verification in the plan bar, lit while
+  verification is armed and pulsing while an import runs. It shows a lock when a
+  Move forces it on, and always carries a text label so the state never depends
+  on colour alone.
+
+### Fixed
+
+- The Options button did nothing. It was placed in a toolbar that used a
+  `.principal` item, which pushed the trailing buttons into an overflow menu;
+  a popover anchored to a button inside that menu has nothing to present from.
+  Both the collapsing and the dead button are gone.
+
 ## [2.0.0] - 2026-08-02
 
 A rebuild of the interface around the two things that matter when you empty a

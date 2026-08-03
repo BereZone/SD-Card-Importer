@@ -110,8 +110,10 @@ struct ContactSheet: View {
     }
 
     private func gridBody(_ items: [ImportCandidate]) -> some View {
+        // Cells top-align, because thumbnails now differ in height: a portrait
+        // frame is taller than a landscape one at the same long edge.
         LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: thumbnailSize), spacing: Metrics.regular)],
+            columns: [GridItem(.adaptive(minimum: thumbnailSize), spacing: Metrics.regular, alignment: .top)],
             alignment: .leading,
             spacing: Metrics.regular
         ) {
@@ -238,7 +240,7 @@ struct ContactSheetCell: View {
                 // Camera filenames differ at the end — DSC01234 vs DSC01235 —
                 // so tail truncation hid the only distinguishing part.
                 .truncationMode(.middle)
-                .frame(width: size, alignment: .leading)
+                .frame(maxWidth: size, alignment: .leading)
 
             if let destination = vm.previewDestinationFolder(for: candidate), !destination.isEmpty {
                 Text(destination)
@@ -246,7 +248,7 @@ struct ContactSheetCell: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.head)
-                    .frame(width: size, alignment: .leading)
+                    .frame(maxWidth: size, alignment: .leading)
                     .help("Will be filed in \(destination)")
             }
         }
@@ -313,7 +315,7 @@ struct FileRow: View {
             .labelsHidden()
 
             Button(action: onPreview) {
-                ThumbnailView(url: candidate.url, size: 28, show: showThumbnail)
+                ThumbnailView(url: candidate.url, size: 28, show: showThumbnail, fixedSquare: true)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Preview \(candidate.url.lastPathComponent)")

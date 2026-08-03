@@ -1,53 +1,86 @@
 import SwiftUI
 
-/// The primary action, and the only custom `ButtonStyle` in the app.
+/// A status light for checksum verification.
 ///
-/// It exists for one reason the stock prominent style cannot cover: this button
-/// changes identity mid-operation (Import becomes Cancel) and must read as
-/// destructive in that state. Everything else about it is standard — no
-/// gradient, no hover-scale, no shadow. The previous style animated scale on
-/// hover and press with two springs, which is motion an ingest tool should not
-/// have while it is moving someone's only copy of a shoot.
+/// Verification is the product's central promise and it is a per-run setting, so
+/// whether it is armed should be readable at a glance rather than by opening a
+/// popover. Lit means every copy is being re-read and compared to its source;
+/// unlit means it is not.
 ///
-/// Crucially it draws a focus ring. The old custom styles drew none, so with
-/// Full Keyboard Access enabled there was no visible focus anywhere on the
-/// primary controls.
-struct PrimaryActionButtonStyle: ButtonStyle {
-    enum Role {
-        case standard
-        case destructive
+/// It is an indicator, not a control — it reports state and never swallows a
+/// click. The label is always present, so the state does not live in colour
+/// alone.
+struct VerificationIndicator: View {
+    /// Verification will run for this import.
+    let isOn: Bool
+    /// Forced on because a Move is selected and an original is never deleted
+    /// unverified.
+    let isLocked: Bool
+    /// An import is running right now.
+    let isActive: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulsing = false
+
+    private var tint: Color { isOn ? .statusSuccess : Color(nsColor: .quaternaryLabelColor) }
+
+    var body: some View {
+        HStack(spacing: Metrics.tight) {
+            ZStack {
+                // The halo only appears while verification is actually doing
+                // something, so a lit-but-idle light never looks like activity.
+                Circle()
+                    .fill(tint.opacity(0.35))
+                    .frame(width: 14, height: 14)
+                    .scaleEffect(pulsing ? 1.0 : 0.6)
+                    .opacity(isOn && isActive ? 1 : 0)
+
+                Circle()
+                    .fill(tint)
+                    .frame(width: 8, height: 8)
+                    .overlay(Circle().strokeBorder(.black.opacity(0.15), lineWidth: 0.5))
+            }
+            .frame(width: 14, height: 14)
+
+            Text(isOn ? "Verifying" : "Not verifying")
+                .font(.caption)
+                .foregroundStyle(isOn ? Color.statusSuccess : .secondary)
+
+            if isLocked {
+                Image(systemName: "lock.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onAppear { startPulseIfNeeded() }
+        .onChange(of: isActive) { startPulseIfNeeded() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Checksum verification")
+        .accessibilityValue(accessibilityValue)
+        .help(helpText)
     }
 
-    var role: Role = .standard
-    @Environment(\.isEnabled) private var isEnabled
-    @FocusState private var isFocused: Bool
-
-    private var fill: Color {
-        switch role {
-        case .standard:    return .brandAccent
-        case .destructive: return .statusDanger
+    private func startPulseIfNeeded() {
+        guard isOn, isActive, !reduceMotion else {
+            pulsing = false
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+            pulsing = true
         }
     }
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.medium))
-            .foregroundStyle(.white)
-            .padding(.horizontal, Metrics.gutter)
-            .padding(.vertical, Metrics.snug)
-            .background(
-                RoundedRectangle(cornerRadius: Metrics.radiusControl, style: .continuous)
-                    .fill(fill.opacity(configuration.isPressed ? 0.8 : 1.0))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Metrics.radiusControl, style: .continuous)
-                    .strokeBorder(Color.brandAccent, lineWidth: isFocused ? 3 : 0)
-                    .padding(-2)
-            )
-            .opacity(isEnabled ? 1.0 : 0.45)
-            .contentShape(Rectangle())
-            .focusable(isEnabled)
-            .focused($isFocused)
+    private var accessibilityValue: String {
+        if !isOn { return "Off. Copies will not be checked against the originals." }
+        if isLocked { return "On and locked, because moving files always verifies before deleting an original." }
+        return isActive ? "On, verifying now." : "On."
+    }
+
+    private var helpText: String {
+        if isLocked { return "Always on when moving files — an original is never deleted unverified" }
+        return isOn
+            ? "Each copy is re-read and compared to the original"
+            : "Copies are not checked against the originals"
     }
 }
 

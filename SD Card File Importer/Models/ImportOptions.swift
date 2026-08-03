@@ -21,9 +21,9 @@ nonisolated struct ImportOptions: Codable {
     /// Re-read each copied file from the destination (uncached) and compare its
     /// SHA-256 hash against the source. Moves always verify regardless of this flag.
     ///
-    /// Ships on. A verified import is the product's central promise; shipping it
-    /// off meant the default configuration did not deliver it.
-    var verifyAfterCopy: Bool = true
+    /// Ships off — verification roughly doubles the read work, and the indicator
+    /// light in the plan bar makes its state visible without opening Options.
+    var verifyAfterCopy: Bool = false
     var ejectAfterImport: Bool = false
     var openDestinationWhenDone: Bool = true
     var folderTemplate: String = "{Camera}/{YYYY}/{MM}/{DD}"

@@ -86,9 +86,17 @@ struct PlanBar: View {
                         .help(vm.destinationURL?.path ?? "")
                 }
 
-                Text(safetyStatement)
-                    .font(.caption)
-                    .foregroundStyle(vm.importWillDeleteOriginals ? Color.statusCaution : .secondary)
+                HStack(spacing: Metrics.snug) {
+                    verificationLight
+
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+
+                    Text(safetyStatement)
+                        .font(.caption)
+                        .foregroundStyle(vm.importWillDeleteOriginals ? Color.statusCaution : .secondary)
+                }
             }
 
             Spacer()
@@ -104,6 +112,17 @@ struct PlanBar: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(vm.importPlanSummary ?? "Import plan")
         .accessibilityHint(safetyStatement)
+    }
+
+    /// Verification is off by default and roughly doubles the read work, so its
+    /// state has to be visible without opening Options — this is the one setting
+    /// whose value changes what the completion message is allowed to claim.
+    private var verificationLight: some View {
+        VerificationIndicator(
+            isOn: vm.options.verifyAfterCopy || vm.options.moveInsteadOfCopy,
+            isLocked: vm.options.moveInsteadOfCopy,
+            isActive: vm.isImporting
+        )
     }
 
     private var destinationDescription: String {
@@ -138,6 +157,8 @@ struct PlanBar: View {
             HStack {
                 Text(vm.isCancelling ? "Cancelling…" : (vm.options.dryRun ? "Previewing…" : "Importing…"))
                     .fontWeight(.medium)
+
+                verificationLight
 
                 Spacer()
 

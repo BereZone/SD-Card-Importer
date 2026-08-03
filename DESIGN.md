@@ -130,15 +130,44 @@ No card carries a colored stroke or a colored shadow. Nested cards do not exist.
 
 ## Controls
 
-- Standard SwiftUI controls by default. Custom `ButtonStyle` only for the
-  primary Import action, and it draws a visible focus ring.
-- `.borderedProminent` for the primary action; `.bordered` for secondary;
-  `.plain` only for genuine icon affordances, which always carry `.help()`.
+- Standard SwiftUI controls throughout. There is no custom `ButtonStyle`; the
+  primary action is `.borderedProminent` with a tint, which gets the platform's
+  focus ring, pressed state, and appearance handling for free.
+- `.borderedProminent` for the primary action, tinted accent normally and red
+  when the operation deletes originals or when it is Cancel; `.bordered` for
+  secondary; `.plain` only for genuine icon affordances, which always carry
+  `.help()`.
+- **Toolbar items never use `.principal`.** Centring an item there pushes the
+  rest outward and makes AppKit collapse them into an overflow `»` menu, which
+  both hides the buttons and breaks any popover anchored to one. Group items
+  with `ToolbarItemGroup` on `.navigation` and `.primaryAction` instead.
+- Options, History, and Import are three separate toolbar buttons. They are not
+  folded into a menu: each is a distinct destination or action, and the one that
+  moves files must never look like a peer of the two that open panels.
 - Every icon-only control has an `.accessibilityLabel` and a `.help()` tooltip.
 - Text fields use the platform field style and keep their focus ring. The old
   `.plain` field with a tinted fill read as disabled.
 - Destructive actions use `role: .destructive` and are confirmed with a
   `confirmationDialog` that names the object at risk.
+
+## Images
+
+Thumbnails keep the aspect ratio of their source. `size` is the long edge; the
+short edge follows from the image, so a landscape frame is wider than tall and a
+portrait frame is taller than wide, and neither is cropped. Grid cells top-align
+because their heights differ. The dense list is the one exception — at 28pt,
+ragged rows cost more than orientation is worth, so it forces a square.
+
+Before an image loads, its box is drawn at 3:2 — the aspect of most stills
+cameras — so the grid does not visibly re-flow as thumbnails arrive.
+
+## Status indication
+
+Verification has a dedicated indicator light in the plan bar: lit green while
+armed, unlit when off, with a halo only while an import is actually running. It
+is an indicator, never a control, and it always carries a text label, so its
+state never depends on colour alone. It appears wherever the operation is
+described — the plan, and the progress readout.
 
 ## Motion
 
