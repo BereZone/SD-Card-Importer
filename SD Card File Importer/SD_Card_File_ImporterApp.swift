@@ -40,8 +40,11 @@ struct ImporterCommands: Commands {
         CommandGroup(replacing: .newItem) { }
 
         CommandMenu("Import") {
-            Button("Refresh Cards") { vm.refreshVolumes(autoScan: true) }
+            Button("Refresh Cards") { vm.clearIgnoresAndRefresh() }
                 .keyboardShortcut("r", modifiers: .command)
+
+            Button("Add Source Folder…") { Task { await vm.addSourceVolume() } }
+                .keyboardShortcut("o", modifiers: .command)
 
             Button("Rescan Files") { vm.scanForCandidates() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])

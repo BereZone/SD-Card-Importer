@@ -26,11 +26,12 @@ can recognize them, reads one sentence saying what will happen and where, and
 presses one button. Afterwards the same bar tells them it succeeded and that the
 copies were verified.
 
-**FIRST VIEWPORT.** Toolbar across the top with refresh, view switcher, an
-Options popover, and the primary Import button on the trailing edge. Source list
-on the left listing physical cards with capacity. Contact sheet filling the
-remaining width. A plan bar pinned to the bottom spanning the content area,
-carrying `CARD → destination path`, counts and size, and the safety statement.
+**FIRST VIEWPORT.** Toolbar across the top with refresh and the view switcher.
+Source list on the left listing physical cards with capacity. Contact sheet
+filling the remaining width. A plan bar pinned to the bottom spanning the content
+area, carrying `CARD → destination path`, counts and size, and the safety
+statement on the left, with Options, History and the primary action on the
+right.
 
 **FORM.** macOS convention, taken deliberately as the standing exit rather than
 rolled for. Craft bar: Panic (shell), Carbon Copy Cloner (risk), Photo Mechanic
@@ -111,16 +112,15 @@ between groups.
 
 Three bands, always:
 
-1. **Toolbar** — real `.toolbar` items, not a card called "Actions". Refresh,
-   view switcher (segmented), Options popover, and the primary Import button on
-   the trailing edge.
+1. **Toolbar** — refresh and the view switcher (segmented). Nothing that must
+   always be visible, because toolbar items collapse.
 2. **Content** — `NavigationSplitView` with a source list of *cards* on the left
    and the contact sheet on the right. Settings and Appearance are not sidebar
    rows; they live in a `Settings` scene reached by ⌘,.
-3. **Plan bar** — pinned to the bottom of the content area, always present. It
-   carries the operation, the destination path, counts, size, and the safety
-   statement; during an import it becomes the progress readout; after one it
-   becomes the result.
+3. **Plan bar** — pinned to the bottom of the content area, always present.
+   Left: the operation, the destination path, counts, size, and the safety
+   statement; during an import the progress readout; after one the result.
+   Right: Options, History, and the primary action.
 
 Window minimum: **820×520**, so the app fits a 13" laptop beside another window.
 The previous 1000×650 did not.
@@ -137,13 +137,20 @@ No card carries a colored stroke or a colored shadow. Nested cards do not exist.
   when the operation deletes originals or when it is Cancel; `.bordered` for
   secondary; `.plain` only for genuine icon affordances, which always carry
   `.help()`.
-- **Toolbar items never use `.principal`.** Centring an item there pushes the
-  rest outward and makes AppKit collapse them into an overflow `»` menu, which
-  both hides the buttons and breaks any popover anchored to one. Group items
-  with `ToolbarItemGroup` on `.navigation` and `.primaryAction` instead.
-- Options, History, and Import are three separate toolbar buttons. They are not
-  folded into a menu: each is a distinct destination or action, and the one that
-  moves files must never look like a peer of the two that open panels.
+- **The window toolbar holds only view controls** — refresh and the layout
+  switcher. It is not trustworthy for anything that must always be visible: a
+  `ToolbarItemGroup` collapses into an overflow `»` menu when space is tight,
+  which also strands any popover anchored to a collapsed item, and a
+  `.borderedProminent` button loses its fill once AppKit adopts it as a toolbar
+  item. `.principal` placement makes both failures worse by pushing everything
+  outward, and is never used.
+- Options, History, and the primary action sit at the trailing end of the plan
+  bar, bottom right, in that order. Owning that layout means they are always
+  present, always labelled, and the action is beside the sentence that says what
+  it will do.
+- The primary action names what it will do — Preview when nothing will be
+  written, Cancel while an import is running, Done when a result is showing —
+  and stays in the same place while doing it. Only the label changes.
 - Every icon-only control has an `.accessibilityLabel` and a `.help()` tooltip.
 - Text fields use the platform field style and keep their focus ring. The old
   `.plain` field with a tinted fill read as disabled.

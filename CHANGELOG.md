@@ -7,33 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Options, History, and Import are now three separate toolbar buttons rather
-  than items that folded into an overflow menu, and Import is filled in the
-  accent colour so it never reads as a peer of the two buttons that just open
-  panels. It turns red when the operation would delete originals, and while an
-  import is running it becomes a red Cancel.
-- Thumbnails keep the shape of their source. Landscape frames are wider than
-  tall and portrait frames are taller than wide, instead of every image being
-  cropped to a square.
-- Verification is off by default again. The indicator light makes its state
-  visible, so the default no longer has to carry that job.
-
-### Added
-
-- An indicator light for checksum verification in the plan bar, lit while
-  verification is armed and pulsing while an import runs. It shows a lock when a
-  Move forces it on, and always carries a text label so the state never depends
-  on colour alone.
-
-### Fixed
-
-- The Options button did nothing. It was placed in a toolbar that used a
-  `.principal` item, which pushed the trailing buttons into an overflow menu;
-  a popover anchored to a button inside that menu has nothing to present from.
-  Both the collapsing and the dead button are gone.
-
 ## [2.0.0] - 2026-08-02
 
 A rebuild of the interface around the two things that matter when you empty a
@@ -45,26 +18,32 @@ foldering — but almost everything you look at while it runs is new.
 
 - The main window has been rebuilt around the contact sheet. Photographs and
   video are shown at a size where you can recognise them, up to 320pt, instead
-  of a 32pt icon that could not be enlarged. Grid, list, and by-day views
-  replace the four near-identical file-browser layouts.
+  of a 32pt icon that could not be enlarged. Thumbnails keep the shape of their
+  source rather than being cropped square. Grid, list, and by-day views replace
+  the four near-identical file-browser layouts.
 - The sidebar now lists your cards, not app sections. Selecting a card filters
   the contact sheet to it and reveals that card's photo and video folder
   assignment in place.
 - A plan bar runs along the bottom of the window at all times. Before an import
   it states the operation, the source card, the resolved destination path, the
-  file count and the total size. During one it carries progress, speed and time
-  remaining. Afterwards it reports the outcome, including whether the copies
-  were verified, with Show in Finder and Retry Failed.
+  file count and the total size. During one it carries progress, speed, time
+  remaining. Afterwards it reports the outcome, including whether the
+  copies were verified, with Show in Finder and Retry Failed.
 - Every file now shows where it will actually land, resolved from your folder
   template, the card's assignment, the detected camera and the file's EXIF date.
   This was previously not visible anywhere; the only preview in the app showed a
-  hardcoded example that ignored the real card.
-- Settings and Appearance moved out of the sidebar into a proper Settings window,
-  so ⌘, works. Import options moved into a toolbar popover next to the button
-  that uses them.
-- The Activity Log became a History inspector you open from the toolbar. Entries
-  carry timestamps and a real severity, and can be filtered to problems only or
-  exported to a file.
+  hardcoded example that ignored the real card. The folder tree in Settings now
+  resolves against the inserted card too, and says so when it is showing
+  examples instead.
+- Options, History, and the main action sit together at the bottom right of the
+  plan bar, always labelled and never collapsing into a menu. The action is
+  filled in your accent colour and turns red when the operation would delete
+  originals or when it is Cancel. The toolbar keeps only refresh and the layout
+  switcher.
+- Settings and Appearance moved out of the sidebar into a proper Settings
+  window, so ⌘, works.
+- The Activity Log became a History inspector. Entries carry timestamps and a
+  real severity, and can be filtered to problems only or exported to a file.
 - The window minimum dropped from 1000×650 to 820×520 so the app fits on a 13"
   laptop beside another window.
 - The interface now uses standard macOS materials, controls, and your own accent
@@ -79,6 +58,15 @@ foldering — but almost everything you look at while it runs is new.
 
 ### Added
 
+- An import can now be cancelled: the primary action becomes Cancel while one
+  runs, stopping after the file in flight rather than leaving Force Quit as the
+  only way out.
+- Moving files off a card now asks for confirmation, naming the card and the
+  number of files, and saying that each original is deleted only after its copy
+  has been verified. Copying starts without interruption.
+- An indicator light for checksum verification, shown wherever the operation is
+  described. It is lit while verification is armed, pulses while an import runs,
+  and shows a lock when a Move forces it on.
 - Full keyboard control: ⌘R refresh, ⇧⌘R rescan, ⌘A and ⇧⌘A select all and none,
   ⌘⏎ start, ⌘. cancel, ⇧⌘D choose destination — all also in a new Import menu.
   The app previously had no keyboard shortcuts at all.
@@ -88,30 +76,25 @@ foldering — but almost everything you look at while it runs is new.
   previously contained no accessibility information of any kind and could not be
   operated with VoiceOver.
 - Import history can be exported to a text file.
-
-- An import can now be cancelled. While files are transferring, Start Import
-  becomes Cancel Import, which stops after the file in flight rather than
-  leaving Force Quit as the only way out.
-- The Actions card now states what Start Import is about to do before you press
-  it — the operation, the file count, the total size, and the destination
-  folder. The destination was previously not shown anywhere in the main window.
-- Moving files off a card now asks for confirmation, naming the card and the
-  number of files, and saying that each original is deleted only after its copy
-  has been verified. Copy and Dry Run still start without interruption.
+- Manually adding a folder or volume as a source is back, as a + in the sidebar's
+  Cards header and as Import ▸ Add Source Folder… (⌘O). Card readers that mount
+  oddly and volumes macOS does not report as removable need it.
 
 ### Fixed
 
 - Inserting or ejecting any volume during an import no longer empties the file
   list the import is working through. The tally at the end read the live list,
   so pulling a card mid-import reported nonsense like "Done. Imported 137/0".
-- Start Import is now disabled when no files are selected, instead of running
-  and reporting "Done. Imported 0/0".
+- Import is now disabled when no files are selected, instead of running and
+  reporting "Done. Imported 0/0".
 - The progress bar no longer stays frozen at 100% after a scan or a finished
   import. It appears only while an import is actually running.
-- Verification is now on by default, and preview mode is off. The shipped
-  defaults previously did the opposite, so a new user's first import copied
-  nothing and reported "Done. Imported 0/482", and an import that did run was
-  not verified — the one thing the app exists to guarantee.
+- Preview mode is no longer on by default. A new user's first import previously
+  copied nothing and reported "Done. Imported 0/482", which reads as failure.
+- Removing a card from the list is no longer permanent. Refresh restores hidden
+  cards instead of re-applying the hidden list, and the sidebar shows a "Show N
+  removed cards" row whenever anything is hidden. Removing a card by accident
+  previously left no way to bring it back for the rest of the session.
 - Custom folder names are now sanitised. "2026/Wedding" silently created a
   nested folder and ".." was accepted unchecked.
 - Long filenames now truncate in the middle. Camera filenames differ at the end,
@@ -119,6 +102,11 @@ foldering — but almost everything you look at while it runs is new.
 - The thumbnail size slider now only sizes thumbnails. It was wired into spacing
   arithmetic in eight unrelated places, including a card with no thumbnails in
   it, and produced negative spacing at its lowest setting.
+- `make build` now fails when the build fails. The recipe piped `xcodebuild`
+  through `grep`, so the exit status came from `grep` and a broken toolchain or
+  a compile error still printed "Build finished." and exited 0. `make debug` and
+  `make test` had the same flaw. A missing Xcode toolchain now reports the
+  `xcode-select` command that fixes it.
 
 ### Removed
 
@@ -129,11 +117,6 @@ foldering — but almost everything you look at while it runs is new.
 - The table view. Grid, list, and by-day remain; the table duplicated the list
   without adding anything.
 - The developer "Debug" scan toggle, which shipped in the main window.
-- `make build` now fails when the build fails. The recipe piped `xcodebuild`
-  through `grep`, so the exit status came from `grep` and a broken toolchain or
-  a compile error still printed "Build finished." and exited 0. `make debug` and
-  `make test` had the same flaw. A missing Xcode toolchain now reports the
-  `xcode-select` command that fixes it.
 
 ## [1.1.0] - 2026-07-28
 

@@ -1019,9 +1019,21 @@ final class ImportViewModel: ObservableObject {
         refreshVolumes(autoPrompt: false)
     }
     
+    /// Cards hidden by the remove button, which a plain refresh will not bring
+    /// back because it re-applies the ignore list.
+    var hiddenCardCount: Int { sessionIgnoredPaths.count }
+
+    /// Refresh, and un-hide anything previously removed from the list.
+    ///
+    /// This is what the Refresh control is wired to. Removing a card only adds
+    /// it to `sessionIgnoredPaths`, so a refresh that respected that list made
+    /// an accidental removal permanent for the session with no way back.
     func clearIgnoresAndRefresh() {
+        if !sessionIgnoredPaths.isEmpty {
+            log("Restoring \(sessionIgnoredPaths.count) removed card(s).")
+        }
         sessionIgnoredPaths.removeAll()
-        refreshVolumes(autoPrompt: true)
+        refreshVolumes(autoPrompt: true, autoScan: true)
     }
     
     private func observeMounts() {

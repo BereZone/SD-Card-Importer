@@ -12,23 +12,133 @@ import SwiftUI
 struct PlanBar: View {
     @ObservedObject var vm: ImportViewModel
     let cardRoot: String?
+    @Binding var showOptions: Bool
+    @Binding var showHistory: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Description on the left, controls on the right.
+    ///
+    /// These controls live here rather than in the window toolbar because a
+    /// macOS toolbar will not keep them: `ToolbarItemGroup` collapses its
+    /// contents into an overflow menu when space is tight, and a
+    /// `.borderedProminent` button loses its fill once AppKit adopts it as a
+    /// toolbar item — so the primary action stopped reading as a button at all.
+    /// Owning the layout means the three controls are always present, always
+    /// labelled, and the action sits directly beside the sentence describing
+    /// what it will do.
     var body: some View {
-        Group {
-            if let result = vm.lastResult, !vm.isImporting {
-                resultView(result)
-            } else if vm.isImporting {
-                progressView
-            } else {
-                planView
+        HStack(alignment: .center, spacing: Metrics.regular) {
+            Group {
+                if let result = vm.lastResult, !vm.isImporting {
+                    resultView(result)
+                } else if vm.isImporting {
+                    progressView
+                } else {
+                    planView
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            actionCluster
         }
         .padding(.horizontal, Metrics.gutter)
         .padding(.vertical, Metrics.regular)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.bar)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: vm.isImporting)
+    }
+
+    // MARK: - Controls
+
+    private var actionCluster: some View {
+        HStack(spacing: Metrics.snug) {
+            Button {
+                showOptions.toggle()
+            } label: {
+                Label("Options", systemImage: "slider.horizontal.3")
+                    .labelStyle(.titleAndIcon)
+            }
+            .help("Date filter, copy or move, verification, and what happens afterwards")
+            .popover(isPresented: $showOptions, arrowEdge: .top) {
+                OptionsPopover(vm: vm)
+            }
+
+            Button {
+                showHistory.toggle()
+            } label: {
+                HStack(spacing: Metrics.tight) {
+                    Label("History", systemImage: "clock.arrow.circlepath")
+                        .labelStyle(.titleAndIcon)
+                    if vm.unreadProblemCount > 0 {
+                        StatusChip(text: "\(vm.unreadProblemCount)", severity: .caution)
+                    }
+                }
+            }
+            .help(showHistory ? "Hide import history" : "Show import history")
+            .accessibilityLabel(
+                vm.unreadProblemCount > 0
+                    ? "Import history, \(vm.unreadProblemCount) problems"
+                    : "Import history"
+            )
+
+            Divider().frame(height: 16)
+
+            primaryAction
+        }
+    }
+
+    /// Always the rightmost control, always filled, never moving. Only its
+    /// label changes: Preview when nothing will be written, Cancel while an
+    /// import is running.
+    @ViewBuilder
+    private var primaryAction: some View {
+        if vm.isImporting {
+            Button {
+                vm.cancelImport()
+            } label: {
+                Text(vm.isCancelling ? "Cancelling…" : "Cancel")
+                    .frame(minWidth: 58)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.statusDanger)
+            .controlSize(.large)
+            .disabled(vm.isCancelling)
+            .help("Stop after the file currently being transferred (⌘.)")
+        } else if let result = vm.lastResult {
+            HStack(spacing: Metrics.snug) {
+                if !result.failed.isEmpty {
+                    Button("Retry \(result.failed.count)") {
+                        Task { await vm.retryFailedImports() }
+                    }
+                    .help("Re-import only the files that failed")
+                }
+                if let destination = result.destination, !result.wasDryRun, result.imported > 0 {
+                    Button("Show in Finder") { NSWorkspace.shared.open(destination) }
+                }
+                Button("Done") { vm.dismissResult() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
+            }
+        } else {
+            Button {
+                vm.requestImport()
+            } label: {
+                Text(vm.options.dryRun ? "Preview" : "Import")
+                    .frame(minWidth: 58)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(vm.importWillDeleteOriginals ? .statusDanger : .brandAccent)
+            .controlSize(.large)
+            .disabled(!vm.canStartImport)
+            .help(importHelp)
+        }
+    }
+
+    private var importHelp: String {
+        if vm.destinationURL == nil { return "Choose a destination folder first" }
+        if vm.selectedCandidatesCount == 0 { return "Select at least one file to import" }
+        return vm.importPlanSummary ?? "Start the import (⌘⏎)"
     }
 
     // MARK: - Before
@@ -173,6 +283,8 @@ struct PlanBar: View {
                         .foregroundStyle(.secondary)
                 }
 
+                // No Cancel here: the toolbar's primary action becomes Cancel
+                // while an import runs, and two cancels would be one too many.
                 Text("\(Int(vm.progress * 100))%")
                     .font(.caption.monospacedDigit().weight(.semibold))
             }
@@ -203,27 +315,7 @@ struct PlanBar: View {
                     .textSelection(.enabled)
             }
 
-            Spacer()
-
-            HStack(spacing: Metrics.snug) {
-                if !result.failed.isEmpty {
-                    Button("Retry \(result.failed.count) Failed") {
-                        Task { await vm.retryFailedImports() }
-                    }
-                    .help("Re-import only the files that failed")
-                }
-
-                if result.destination != nil && !result.wasDryRun && result.imported > 0 {
-                    Button("Show in Finder") {
-                        if let destination = result.destination {
-                            NSWorkspace.shared.open(destination)
-                        }
-                    }
-                }
-
-                Button("Done") { vm.dismissResult() }
-                    .keyboardShortcut(.defaultAction)
-            }
+            Spacer(minLength: 0)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(resultHeadline(result)). \(resultDetail(result))")

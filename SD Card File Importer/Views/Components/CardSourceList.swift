@@ -17,11 +17,44 @@ struct CardSourceList: View {
 
     var body: some View {
         List(selection: $selectedCard) {
-            Section("Cards") {
+            Section {
                 allCardsRow
 
                 ForEach(vm.removableVolumes, id: \.self) { url in
                     cardRow(for: url)
+                }
+
+                // Removing a card only hides it, so hiding has to be visibly
+                // undoable. Without this the only clue that anything was removed
+                // was the card no longer being there.
+                if vm.hiddenCardCount > 0 {
+                    Button {
+                        vm.clearIgnoresAndRefresh()
+                    } label: {
+                        Label(
+                            "Show \(vm.hiddenCardCount) removed card\(vm.hiddenCardCount == 1 ? "" : "s")",
+                            systemImage: "arrow.uturn.backward"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Bring back cards you removed from this list")
+                }
+            } header: {
+                HStack {
+                    Text("Cards")
+                    Spacer()
+                    Button {
+                        Task { await vm.addSourceVolume() }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.plain)
+                    // Cards that macOS does not report as removable, network
+                    // volumes, and card readers that mount oddly all need a
+                    // manual way in. Losing this button made those unusable.
+                    .iconOnlyLabel("Add a folder or volume as a source")
                 }
             }
 
@@ -103,7 +136,7 @@ struct CardSourceList: View {
                 // The old glyph here was an eject symbol on a button that does
                 // not eject — it drops the card from this list and forgets its
                 // permission. Two different meanings of "eject" in one app.
-                .iconOnlyLabel("Remove \(url.lastPathComponent) from the list. This does not eject the card.")
+                .iconOnlyLabel("Hide \(url.lastPathComponent) from this list. It does not eject the card, and Refresh brings it back.")
             }
 
             if let storage = vm.getStorageInfo(for: url) {

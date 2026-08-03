@@ -30,7 +30,7 @@ struct ImporterView: View {
 
                 Divider()
 
-                PlanBar(vm: vm, cardRoot: selectedCard)
+                PlanBar(vm: vm, cardRoot: selectedCard, showOptions: $showOptions, showHistory: $showHistory)
             }
             .background(Color.surfaceBackground)
             .navigationTitle(cardTitle)
@@ -81,23 +81,27 @@ struct ImporterView: View {
 
     // MARK: - Toolbar
 
-    /// One `ToolbarItemGroup` per side, and no `.principal` placement.
+    /// Only the two view controls live here.
     ///
-    /// `.principal` centres an item in the title area and pushes everything else
-    /// outward, which made AppKit collapse the trailing buttons into an overflow
-    /// "»" menu as soon as the window was anything short of wide. That also broke
-    /// Options outright: a popover anchored to a button that has been folded into
-    /// the overflow menu has no anchor left to present from, so the click
-    /// registered and nothing appeared.
+    /// Options, History and the primary action moved to the plan bar, because a
+    /// macOS toolbar refuses to hold them reliably: a `ToolbarItemGroup`
+    /// collapses into an overflow menu when space is tight — which also strands
+    /// any popover anchored to a collapsed item — and a `.borderedProminent`
+    /// button loses its fill once AppKit adopts it, so the primary action
+    /// stopped reading as a button. Refresh and the layout switcher are plain
+    /// enough to survive as toolbar items.
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
             Button {
-                vm.refreshVolumes(autoScan: true)
+                // Clears the hidden-card list too, so Refresh genuinely means
+                // "look again" rather than "look again, minus whatever I
+                // removed by accident".
+                vm.clearIgnoresAndRefresh()
             } label: {
                 Image(systemName: "arrow.clockwise")
             }
-            .iconOnlyLabel("Refresh cards (⌘R)")
+            .iconOnlyLabel("Refresh cards, restoring any you removed (⌘R)")
             .disabled(vm.isImporting)
 
             Picker("View", selection: $layout) {
@@ -113,76 +117,6 @@ struct ImporterView: View {
             .accessibilityValue(layout.title)
         }
 
-        ToolbarItemGroup(placement: .primaryAction) {
-            optionsButton
-            historyButton
-            primaryAction
-        }
     }
 
-    private var optionsButton: some View {
-        Button {
-            showOptions.toggle()
-        } label: {
-            Label("Options", systemImage: "slider.horizontal.3")
-        }
-        .help("Import options")
-        // Anchored to a button that is always visible in the toolbar, so the
-        // popover always has something to point at.
-        .popover(isPresented: $showOptions, arrowEdge: .bottom) {
-            OptionsPopover(vm: vm)
-        }
-    }
-
-    private var historyButton: some View {
-        Button {
-            showHistory.toggle()
-        } label: {
-            // `.badge` does nothing on a macOS toolbar button, so the count goes
-            // in the label where it can actually be seen and read aloud.
-            Label(
-                vm.unreadProblemCount > 0 ? "History (\(vm.unreadProblemCount))" : "History",
-                systemImage: "clock.arrow.circlepath"
-            )
-        }
-        .help(showHistory ? "Hide import history" : "Show import history")
-        .accessibilityLabel(
-            vm.unreadProblemCount > 0
-                ? "Import history, \(vm.unreadProblemCount) problems"
-                : "Import history"
-        )
-    }
-
-    /// Filled rather than bordered, so the one button that starts moving files
-    /// never reads as a peer of the two that open panels.
-    @ViewBuilder
-    private var primaryAction: some View {
-        if vm.isImporting {
-            Button {
-                vm.cancelImport()
-            } label: {
-                Text(vm.isCancelling ? "Cancelling…" : "Cancel")
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.statusDanger)
-            .disabled(vm.isCancelling)
-            .help("Stop after the file currently being transferred (⌘.)")
-        } else {
-            Button {
-                vm.requestImport()
-            } label: {
-                Text(vm.options.dryRun ? "Preview" : "Import")
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(vm.importWillDeleteOriginals ? .statusDanger : .brandAccent)
-            .disabled(!vm.canStartImport)
-            .help(importHelp)
-        }
-    }
-
-    private var importHelp: String {
-        if vm.destinationURL == nil { return "Choose a destination folder first" }
-        if vm.selectedCandidatesCount == 0 { return "Select at least one file to import" }
-        return vm.importPlanSummary ?? "Start the import (⌘⏎)"
-    }
 }
