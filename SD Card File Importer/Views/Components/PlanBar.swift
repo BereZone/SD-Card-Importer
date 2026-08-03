@@ -112,8 +112,18 @@ struct PlanBar: View {
                     }
                     .help("Re-import only the files that failed")
                 }
-                if let destination = result.destination, !result.wasDryRun, result.imported > 0 {
-                    Button("Show in Finder") { NSWorkspace.shared.open(destination) }
+                if !result.wasDryRun, result.imported > 0, !result.revealTargets.isEmpty {
+                    Button("Show in Finder") {
+                        let targets = result.revealTargets
+                        if targets.count == 1, let only = targets.first {
+                            NSWorkspace.shared.open(only)
+                        } else {
+                            // Photos and videos can land in different folders,
+                            // so select them all rather than picking one.
+                            NSWorkspace.shared.activateFileViewerSelecting(targets)
+                        }
+                    }
+                    .help("Open \(result.revealTargets.map(\.lastPathComponent).joined(separator: ", "))")
                 }
                 Button("Done") { vm.dismissResult() }
                     .buttonStyle(.borderedProminent)
@@ -359,8 +369,25 @@ struct PlanBar: View {
         if r.skipped > 0 { parts.append("\(r.skipped) already present") }
         if r.renamed > 0 { parts.append("\(r.renamed) renamed to avoid a clash") }
         if r.wasMove && r.succeeded && !r.wasDryRun { parts.append("originals removed from the card") }
-        if let destination = r.destination { parts.append("→ \(destination.lastPathComponent)") }
+        // Name the folder the files are actually in, relative to the chosen
+        // root, rather than the root itself.
+        if let root = r.destination {
+            let landed = r.destinationFolders.compactMap { relativePath(of: $0, under: root) }
+            if landed.isEmpty {
+                parts.append("→ \(root.lastPathComponent)")
+            } else {
+                parts.append("→ \(root.lastPathComponent)/\(landed.joined(separator: " + "))")
+            }
+        }
         return parts.joined(separator: " · ")
+    }
+
+    private func relativePath(of url: URL, under root: URL) -> String? {
+        let rootParts = root.standardizedFileURL.pathComponents
+        let parts = url.standardizedFileURL.pathComponents
+        guard parts.count > rootParts.count,
+              Array(parts.prefix(rootParts.count)) == rootParts else { return nil }
+        return parts.dropFirst(rootParts.count).joined(separator: "/")
     }
 
     // MARK: - Shared

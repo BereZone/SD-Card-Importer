@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Show in Finder after an import opens the folder the files actually landed in,
+  rather than the destination root. When photos and videos were routed to
+  different folders it now reveals both. The summary line names the folder too,
+  instead of repeating the root.
+
 ## [2.0.0] - 2026-08-02
 
 A rebuild of the interface around the two things that matter when you empty a
