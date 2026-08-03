@@ -6,6 +6,12 @@
 #
 # Run `make help` for the target list.
 
+# Recipes pipe xcodebuild through grep to trim its output. Without pipefail the
+# pipeline reports grep's status, so a toolchain failure or a compile error would
+# exit 0 and every build gate in CONTRIBUTING/AGENTS would be unfalsifiable.
+SHELL        := /bin/bash
+.SHELLFLAGS  := -o pipefail -c
+
 PROJECT      := SD Card File Importer.xcodeproj
 SCHEME       := SD Card File Importer
 APP_NAME     := SD Card File Importer
@@ -18,7 +24,7 @@ SEMVER_RE := ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)
 
 VERSION := $(shell grep -m1 'MARKETING_VERSION' '$(PBXPROJ)' | sed 's/.*= *//; s/;//' | tr -d ' ')
 
-.PHONY: help version build debug run clean test bump tag untag release-check
+.PHONY: help version build debug run clean test bump tag untag release-check check-toolchain
 
 help:
 	@echo "SD Card File Importer - current version $(VERSION)"
@@ -40,17 +46,32 @@ version:
 
 # ---------------------------------------------------------------- build
 
-build:
+# `xcodebuild` is a stub under Command Line Tools and exits non-zero with a
+# message that reads like a warning. Catch it here with an instruction instead
+# of letting the build fail further down for a reason nobody can act on.
+check-toolchain:
+	@if ! xcodebuild -version >/dev/null 2>&1; then \
+		echo "error: xcodebuild is unavailable - the active developer directory is"; \
+		echo "       $$(xcode-select -p 2>/dev/null || echo 'unset')"; \
+		echo ""; \
+		echo "       Point it at a full Xcode install:"; \
+		echo "         sudo xcode-select -s /Applications/Xcode.app/Contents/Developer"; \
+		exit 1; \
+	fi
+
+# The `|| true` is scoped to grep alone: grep exits 1 when a build produces no
+# matching lines, which is success. pipefail then surfaces xcodebuild's status.
+build: check-toolchain
 	@xcodebuild build -project "$(PROJECT)" -scheme "$(SCHEME)" \
 		-configuration Release -destination "platform=macOS" \
 		CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO | \
-		grep -E "error:|warning:|BUILD" || true
+		{ grep -E "error:|warning:|BUILD" || true; }
 	@echo "Build finished."
 
-debug:
+debug: check-toolchain
 	@xcodebuild build -project "$(PROJECT)" -scheme "$(SCHEME)" \
 		-configuration Debug -destination "platform=macOS" | \
-		grep -E "error:|warning:|BUILD" || true
+		{ grep -E "error:|warning:|BUILD" || true; }
 
 run: debug
 	@APP_PATH=$$(xcodebuild -project "$(PROJECT)" -scheme "$(SCHEME)" \
@@ -65,12 +86,12 @@ clean:
 
 # Skip rather than fail when no test target exists, so this stays usable until
 # one is added to the Xcode project.
-test:
+test: check-toolchain
 	@if xcodebuild -list -project "$(PROJECT)" -json 2>/dev/null | \
 		grep -q '"[^"]*Tests"'; then \
 		xcodebuild test -project "$(PROJECT)" -scheme "$(SCHEME)" \
 			-destination "platform=macOS" | \
-			grep -E "error:|Test Suite|BUILD|TEST" || true; \
+			{ grep -E "error:|Test Suite|BUILD|TEST" || true; }; \
 	else \
 		echo "No test target in the Xcode project - skipping."; \
 		echo "Add one in Xcode and this will start running automatically."; \
