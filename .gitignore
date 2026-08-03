@@ -25,3 +25,6 @@ Pods/
 
 # Optional: API Keys / Sensitive Data (if stored in config files)
 *.xcconfig
+
+# Impeccable design-tool working state (critique snapshots, local config).
+.impeccable/

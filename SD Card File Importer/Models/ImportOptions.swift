@@ -13,11 +13,17 @@ nonisolated struct ImportOptions: Codable {
         var id: String { rawValue }
     }
     
-    var dryRun: Bool = true
+    /// Ships off. Copying never destroys anything, so a preview-by-default gains
+    /// no safety — it only meant a new user's first import did nothing and
+    /// reported "Done. Imported 0/482", which reads as total failure.
+    var dryRun: Bool = false
     var moveInsteadOfCopy: Bool = false
     /// Re-read each copied file from the destination (uncached) and compare its
     /// SHA-256 hash against the source. Moves always verify regardless of this flag.
-    var verifyAfterCopy: Bool = false
+    ///
+    /// Ships on. A verified import is the product's central promise; shipping it
+    /// off meant the default configuration did not deliver it.
+    var verifyAfterCopy: Bool = true
     var ejectAfterImport: Bool = false
     var openDestinationWhenDone: Bool = true
     var folderTemplate: String = "{Camera}/{YYYY}/{MM}/{DD}"

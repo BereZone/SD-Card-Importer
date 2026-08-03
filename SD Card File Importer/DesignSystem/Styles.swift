@@ -1,119 +1,108 @@
 import SwiftUI
 
-// Custom card styling with glassmorphism effect
-struct ModernCardStyle: ViewModifier {
-    var accentColor: Color = .accentPrimary
-    
-    func body(content: Content) -> some View {
-        content
-            .padding(10)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.cardBackground)
-                    .shadow(color: accentColor.opacity(0.1), radius: 8, x: 0, y: 3)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(accentColor.opacity(0.2), lineWidth: 1)
-            )
+/// The primary action, and the only custom `ButtonStyle` in the app.
+///
+/// It exists for one reason the stock prominent style cannot cover: this button
+/// changes identity mid-operation (Import becomes Cancel) and must read as
+/// destructive in that state. Everything else about it is standard — no
+/// gradient, no hover-scale, no shadow. The previous style animated scale on
+/// hover and press with two springs, which is motion an ingest tool should not
+/// have while it is moving someone's only copy of a shoot.
+///
+/// Crucially it draws a focus ring. The old custom styles drew none, so with
+/// Full Keyboard Access enabled there was no visible focus anywhere on the
+/// primary controls.
+struct PrimaryActionButtonStyle: ButtonStyle {
+    enum Role {
+        case standard
+        case destructive
     }
-}
 
-// Premium button style with gradient and hover effect
-struct PremiumButtonStyle: ButtonStyle {
-    var color: Color = .accentPrimary
-    @State private var isHovered = false
-    
+    var role: Role = .standard
+    @Environment(\.isEnabled) private var isEnabled
+    @FocusState private var isFocused: Bool
+
+    private var fill: Color {
+        switch role {
+        case .standard:    return .brandAccent
+        case .destructive: return .statusDanger
+        }
+    }
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(.body, design: .rounded).weight(.medium))
-            .foregroundColor(.white)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
+            .font(.body.weight(.medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, Metrics.gutter)
+            .padding(.vertical, Metrics.snug)
             .background(
-                LinearGradient(
-                    colors: [color, color.opacity(0.8)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .cornerRadius(10)
-            .shadow(color: color.opacity(0.3), radius: isHovered ? 8 : 4, y: isHovered ? 4 : 2)
-            .scaleEffect(configuration.isPressed ? 0.96 : (isHovered ? 1.02 : 1.0))
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
-            .onHover { hovering in
-                isHovered = hovering
-            }
-    }
-}
-
-// Secondary button style
-struct SecondaryButtonStyle: ButtonStyle {
-    @State private var isHovered = false
-    
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(.body, design: .rounded).weight(.medium))
-            .foregroundColor(.accentPrimary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.accentPrimary.opacity(isHovered ? 0.15 : 0.1))
+                RoundedRectangle(cornerRadius: Metrics.radiusControl, style: .continuous)
+                    .fill(fill.opacity(configuration.isPressed ? 0.8 : 1.0))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.accentPrimary.opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: Metrics.radiusControl, style: .continuous)
+                    .strokeBorder(Color.brandAccent, lineWidth: isFocused ? 3 : 0)
+                    .padding(-2)
             )
-            .scaleEffect(configuration.isPressed ? 0.96 : (isHovered ? 1.02 : 1.0))
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-            .onHover { hovering in
-                isHovered = hovering
-            }
+            .opacity(isEnabled ? 1.0 : 0.45)
+            .contentShape(Rectangle())
+            .focusable(isEnabled)
+            .focused($isFocused)
     }
 }
 
-// Section header style
-struct SectionHeaderStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .font(.system(.title3, design: .rounded).weight(.semibold))
-            .foregroundStyle(
-                LinearGradient(
-                    colors: [.accentPrimary, .accentSecondary],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-    }
-}
-
-// Status badge style
-struct StatusBadge: View {
+/// A count or state chip. Tinted background with a matching foreground, rather
+/// than white text on a saturated fill — the old badge put white captions on the
+/// system secondary grey whenever a count was zero, which was unreadable in
+/// light appearance.
+struct StatusChip: View {
     let text: String
-    let color: Color
-    
+    var severity: Severity = .info
+
     var body: some View {
         Text(text)
-            .font(.system(.caption, design: .rounded).weight(.semibold))
-            .foregroundColor(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(severity == .info ? Color.secondary : severity.tint)
+            .padding(.horizontal, Metrics.snug)
+            .padding(.vertical, 3)
             .background(
-                Capsule()
-                    .fill(color)
+                Capsule().fill(
+                    severity == .info
+                        ? Color(nsColor: .quaternaryLabelColor)
+                        : severity.tint.opacity(0.15)
+                )
             )
     }
 }
 
-// View extensions for easy styling
-extension View {
-    func modernCard(accentColor: Color = .accentPrimary) -> some View {
-        modifier(ModernCardStyle(accentColor: accentColor))
+/// A section title inside a panel. Plain `.headline` — emphasis comes from
+/// weight, which is what the platform does. The previous treatment filled every
+/// heading with the same blue-to-purple gradient, so six unrelated headings were
+/// typographically identical and nothing on screen was the subject.
+struct SectionTitle: View {
+    let text: String
+    var symbol: String?
+
+    var body: some View {
+        Label {
+            Text(text).font(.headline)
+        } icon: {
+            if let symbol {
+                Image(systemName: symbol).foregroundStyle(.secondary)
+            }
+        }
+        .labelStyle(.titleAndIcon)
+        .accessibilityAddTraits(.isHeader)
     }
-    
-    func sectionHeader() -> some View {
-        modifier(SectionHeaderStyle())
+}
+
+extension View {
+    /// Attaches both the pointer tooltip and the VoiceOver name, because an
+    /// icon-only control needs both and they are the same sentence. Eight
+    /// icon-only controls previously had neither.
+    func iconOnlyLabel(_ description: String) -> some View {
+        self
+            .help(description)
+            .accessibilityLabel(description)
     }
 }
