@@ -44,18 +44,42 @@ in Xcode is enough to switch both on.
 
 ```
 SD Card File Importer/
-├── Models/          Value types: ImportCandidate, ImportOptions, MediaTypes
+├── Models/          Value types, no behaviour of their own
+│   ├── ImportCandidate        One discovered file
+│   ├── ImportOptions          Everything the user can set
+│   ├── ImportResult           What a finished import did
+│   ├── LogEntry               One line of history
+│   ├── MediaTypes             Which extensions count as photo or video
+│   └── Formatting             Shared byte and duration formatting
 ├── Services/        Filesystem and system work
 │   ├── FileScanningService    Volume detection, media discovery, EXIF dates
 │   ├── FileImportService      Streaming copy, SHA-256 verification, eject
+│   ├── DestinationPlanner     Where a file will land, and under what name
+│   ├── TransferRateEstimator  Rolling-window transfer rate and time remaining
 │   ├── ThumbnailService       QuickLook thumbnail generation and caching
 │   └── PermissionService      Security-scoped bookmarks for sandbox access
 ├── Strategies/      Per-manufacturer card layout detection
 │   └── Profiles/    Canon, Nikon, Sony, Fujifilm, Panasonic, DJI, Generic
-├── ViewModels/      ImportViewModel — all app state, @MainActor
+├── ViewModels/      @MainActor
+│   ├── ImportSession          Runs one import and reports the outcome
+│   ├── ImportViewModel        Published state and the entry points views call
+│   ├── ImportViewModel+Cards        Card discovery, permission, scanning
+│   └── ImportViewModel+Persistence  Settings that outlive a launch
 ├── Views/           SwiftUI views and components
 └── DesignSystem/    Colors and shared styles
 ```
+
+`ImportViewModel` is a façade, not an engine. It holds the published state SwiftUI
+binds to and delegates the actual work to types that do not know the interface
+exists. Two of those are worth knowing about before changing anything:
+
+- **`DestinationPlanner`** resolves the four inputs that decide where a file goes
+  — folder template, per-card folder assignment, detected camera profile, capture
+  date. Every mistake this app can make is a destination mistake, and they are all
+  made here.
+- **`ImportSession`** runs one import from a snapshot of the plan and reports back
+  through closures. It never reads live view state, which is what stops a card
+  being pulled mid-run from changing the work in flight.
 
 ## Things worth knowing
 
@@ -63,8 +87,8 @@ SD Card File Importer/
 security-scoped bookmarks managed by `PermissionService`. If a volume seems
 unreadable in a debug build, the bookmark is the first thing to check.
 
-**Files are imported strictly one at a time.** `ImportViewModel.importAll()`
-awaits each file before starting the next. This is deliberate — it keeps progress reporting
+**Files are imported strictly one at a time.** `ImportSession.run()` awaits each
+file before starting the next. This is deliberate — it keeps progress reporting
 honest and avoids thrashing a card with concurrent reads. The overlap described
 below happens *within* a single file, not across files.
 
