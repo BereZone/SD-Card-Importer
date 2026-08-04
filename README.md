@@ -34,6 +34,8 @@ To build from source instead, see [docs/development.md](docs/development.md).
 ## Documentation
 
 - [Development](docs/development.md) — building, running, project layout
+- [Product](docs/product.md) — who the app is for and what it promises them
+- [Design](docs/design.md) — the visual system and the reasoning behind it
 - [Releasing](docs/releasing.md) — versioning and publishing a release
 - [Contributing](CONTRIBUTING.md) — conventions and how to submit a change
 - [Changelog](CHANGELOG.md) — what changed in each version

@@ -1,9 +1,7 @@
 # Design
 
-<!-- impeccable:design-schema 1 -->
-
 The durable visual system for SD Card File Importer. Product truth lives in
-[PRODUCT.md](PRODUCT.md); this file owns how the app looks and behaves.
+[product.md](product.md); this file owns how the app looks and behaves.
 
 ## Direction contract
 
