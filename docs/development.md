@@ -63,15 +63,26 @@ SD Card File Importer/
 security-scoped bookmarks managed by `PermissionService`. If a volume seems
 unreadable in a debug build, the bookmark is the first thing to check.
 
-**Imports run strictly sequentially.** `ImportViewModel.importAll()` awaits each
-file before starting the next. This is deliberate — it keeps progress reporting
-honest and avoids thrashing a card with concurrent reads.
+**Files are imported strictly one at a time.** `ImportViewModel.importAll()`
+awaits each file before starting the next. This is deliberate — it keeps progress reporting
+honest and avoids thrashing a card with concurrent reads. The overlap described
+below happens *within* a single file, not across files.
 
-**Copies stream in 1 MB chunks inside an autorelease pool.** The loop in
-`FileImportService.copyFile` has no suspension point, so without a pool per chunk
-every buffer for a file stays resident until that file finishes, and peak memory
-tracks file size one-for-one. If you restructure that loop, measure
-`phys_footprint` against a multi-gigabyte file before and after.
+**Copies stream in 8 MB chunks inside an autorelease pool.** The loop lives in
+`FileImportService.streamCopy` and has no suspension point, so without a pool per
+chunk every buffer for a file stays resident until that file finishes, and peak
+memory tracks file size one-for-one. The chunk size is measured, not arbitrary —
+`FileImportService.chunkSize` carries the numbers and the reasoning. Throughput
+plateaus from 4 MB up; dropping back to 1 MB costs about 12%. If you restructure
+that loop, measure `phys_footprint` against a multi-gigabyte file before and
+after, and re-measure throughput against real removable media rather than a
+RAM-backed disk image.
+
+**Reads and writes overlap inside a file.** `streamCopy` hands each chunk to a
+serial write queue with a depth-2 semaphore, so the card keeps streaming instead
+of idling through every write. Measured on a UHS-II V60 card this took a 321 MB
+clip from 192 to 246 MB/s writing to exFAT. Depth 2 bounds the in-flight buffers
+to about three chunks, which is what keeps memory flat.
 
 **Both file descriptors set `F_NOCACHE`.** A card import reads each byte once and
 never re-reads it, so caching buys nothing and a large import would otherwise

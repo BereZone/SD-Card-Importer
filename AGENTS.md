@@ -46,3 +46,8 @@ workflow fails if the tag and `MARKETING_VERSION` disagree.
 - `CHANGELOG.md` has an entry under `## [Unreleased]` if the change is
   user-visible.
 - The commit subject is a valid Conventional Commit.
+- Any document in `docs/` that describes the behaviour you changed has been
+  updated in the same commit. `docs/development.md` in particular names types,
+  methods and measured numbers; a change that moves or invalidates one of those
+  must move the documentation with it. Stale documentation is worse than none,
+  because it is trusted.
