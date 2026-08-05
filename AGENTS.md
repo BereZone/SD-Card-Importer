@@ -21,8 +21,7 @@ This project follows three conventions. Apply them to every change.
 
 ## Commit attribution
 
-Commits carry the repository owner's name only. Do not add `Co-Authored-By`
-trailers, "Generated with" footers, or any other AI attribution.
+Commits carry the commiter's name only.
 
 ## Repository layout
 
