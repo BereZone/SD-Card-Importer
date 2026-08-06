@@ -9,6 +9,11 @@ rather than trusting card timestamps, and files everything into a folder templat
 you control. Copies are checksummed as they stream, so a verified import tells
 you the bytes on disk match the bytes on the card.
 
+![The SD Card File Importer window: a card list on the left showing capacity, a
+contact sheet of selected photos and video in the middle, and a plan bar along
+the bottom reading "Untitled → T7/A7C Videos/2026/08_August/05" with Options,
+History and Import controls.](docs/images/preview.png)
+
 ## Requirements
 
 macOS 14.0 or later.

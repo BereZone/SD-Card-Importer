@@ -23,6 +23,10 @@ Pods/
 !SD Card File Importer/Assets.xcassets/**/*.png
 !sd_card.png
 
+# Screenshots that documentation links to have to ship with the docs, or the
+# README renders a broken image on GitHub.
+!docs/images/*.png
+
 # Optional: API Keys / Sensitive Data (if stored in config files)
 *.xcconfig
 
