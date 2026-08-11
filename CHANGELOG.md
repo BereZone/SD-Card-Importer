@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A card's Photos and Videos pickers now offer the folders that actually exist
+  in your destination, so you can file a card straight into one you already
+  keep. The folder becomes the base and the dated subfolders are still built
+  underneath it. New Folder… replaces Custom… for a folder that does not exist
+  yet; it is created during the import as before.
+
+### Removed
+
+- Settings ▸ Folder Names. The names it held were typed by hand and matched
+  nothing on disk, so a card could be assigned a folder that did not exist while
+  the folder you wanted could not be chosen. The pickers read the destination
+  instead. Names saved in that list are not carried over.
+
 ### Fixed
+
+- Cards in the sidebar can be selected again. Clicking one had no effect, which
+  also meant its Photos and Videos folder pickers never appeared and the contact
+  sheet could not be narrowed to a single card.
 
 - Show in Finder after an import opens the folder the files actually landed in,
   rather than the destination root. When photos and videos were routed to

@@ -16,8 +16,9 @@ several cards in different formats and folder layouts.
 
 They are not IT people. They are comfortable with folders and file naming but
 have no interest in the mechanics of copying. Defaults must generalize beyond
-any single kit; the shipped bucket list is one person's cameras and is a
-starting point, not a model of the audience.
+any single kit, which is why the per-card folder pickers offer the folders that
+exist in the user's own destination rather than a list of camera names shipped
+with the app.
 
 ## Product Purpose
 

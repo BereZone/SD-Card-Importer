@@ -16,7 +16,16 @@ struct CardSourceList: View {
     @State private var customName: String = ""
 
     var body: some View {
-        List(selection: $selectedCard) {
+        // The tag on each row must have the same type as the List's selection
+        // *value* — String, not String?. Tagging with `String?.some(key)` made
+        // every tag an Optional<String>, which matches nothing, so clicking a
+        // row silently failed to select it and the per-card pickers below could
+        // never appear. "All Cards" is nil to the rest of the app, so it travels
+        // through the List as a sentinel and is unwrapped here.
+        List(selection: Binding<String?>(
+            get: { selectedCard ?? CardSourceList.allCardsSentinel },
+            set: { selectedCard = $0 == CardSourceList.allCardsSentinel ? nil : $0 }
+        )) {
             Section {
                 allCardsRow
 
@@ -67,7 +76,7 @@ struct CardSourceList: View {
             destinationFooter
         }
         .alert(
-            customPrompt.map { "Custom folder for \($0.mediaType.title.lowercased())" } ?? "",
+            customPrompt.map { "New folder for \($0.mediaType.title.lowercased())" } ?? "",
             isPresented: Binding(
                 get: { customPrompt != nil },
                 set: { if !$0 { customPrompt = nil } }
@@ -77,7 +86,7 @@ struct CardSourceList: View {
             Button("Set") { commitCustomName() }
             Button("Cancel", role: .cancel) { customPrompt = nil }
         } message: {
-            Text("Files from this card land in this folder inside the destination. Slashes are replaced with dashes.")
+            Text("Files from this card land in this folder inside the destination. It is created during the import. Slashes are replaced with dashes.")
         }
     }
 
@@ -98,7 +107,7 @@ struct CardSourceList: View {
         } icon: {
             Image(systemName: "square.grid.2x2")
         }
-        .tag(String?.none)
+        .tag(CardSourceList.allCardsSentinel)
         .accessibilityLabel("All cards, \(count) files")
     }
 
@@ -155,15 +164,26 @@ struct CardSourceList: View {
                 Divider().padding(.vertical, 2)
                 folderPicker(for: key, mediaType: .photos)
                 folderPicker(for: key, mediaType: .videos)
+
+                if vm.destinationFolders.isEmpty {
+                    Text(destinationHint)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .padding(.vertical, Metrics.tight)
-        .tag(String?.some(key))
+        .tag(key)
     }
 
     private func folderPicker(for key: String, mediaType: CardMediaType) -> some View {
         let current = mediaType.currentValue(vm: vm, key: key)
-        let isCustom = current != CardSourceList.autoDetect && !vm.dropdownBuckets.contains(current)
+        let folders = vm.destinationFolders
+        // An assignment whose folder is not on disk — typed through New Folder…,
+        // or left behind by a different destination — still has to appear, or the
+        // picker would silently show something other than what is stored.
+        let isPending = current != CardSourceList.autoDetect && !folders.contains(current)
 
         return HStack(spacing: Metrics.snug) {
             Text(mediaType.title)
@@ -172,10 +192,10 @@ struct CardSourceList: View {
                 .frame(width: 46, alignment: .leading)
 
             Picker(mediaType.title, selection: Binding(
-                get: { isCustom ? CardSourceList.customSentinel : current },
+                get: { current },
                 set: { newValue in
                     if newValue == CardSourceList.customSentinel {
-                        customName = isCustom ? current : ""
+                        customName = ""
                         customPrompt = CustomFolderPrompt(key: key, mediaType: mediaType)
                     } else {
                         mediaType.apply(vm: vm, key: key, value: newValue)
@@ -183,13 +203,19 @@ struct CardSourceList: View {
                 }
             )) {
                 Text("Auto-detect").tag(CardSourceList.autoDetect)
-                Divider()
-                ForEach(vm.dropdownBuckets, id: \.self) { name in
-                    Text(name).tag(name)
+
+                if isPending || !folders.isEmpty {
+                    Divider()
+                    if isPending {
+                        Text("\(current) — not created yet").tag(current)
+                    }
+                    ForEach(folders, id: \.self) { name in
+                        Text(name).tag(name)
+                    }
                 }
+
                 Divider()
-                Text(isCustom ? "Custom: \(current)" : "Custom…")
-                    .tag(CardSourceList.customSentinel)
+                Text("New Folder…").tag(CardSourceList.customSentinel)
             }
             .labelsHidden()
             .controlSize(.small)
@@ -254,8 +280,20 @@ struct CardSourceList: View {
         customPrompt = nil
     }
 
+    /// Why the pickers list real folders rather than a list kept in Settings:
+    /// a typed name that matched nothing on disk looked identical to one that
+    /// did, and the folder you actually wanted could only be reached by spelling
+    /// it out exactly.
+    private var destinationHint: String {
+        guard let dest = vm.destinationURL else {
+            return "Choose a destination to list its folders."
+        }
+        return "No folders in \(dest.lastPathComponent) yet. Use New Folder… to add one."
+    }
+
     static let autoDetect = "Auto-Detect"
     static let customSentinel = "\u{0001}custom"
+    static let allCardsSentinel = "\u{0001}all"
 
     struct CustomFolderPrompt: Identifiable {
         let key: String

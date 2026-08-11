@@ -12,9 +12,6 @@ struct SettingsWindow: View {
             OrganizationSettings(vm: vm)
                 .tabItem { Label("Organization", systemImage: "folder") }
 
-            FolderNameSettings(vm: vm)
-                .tabItem { Label("Folder Names", systemImage: "tag") }
-
             AppearanceSettings()
                 .tabItem { Label("Appearance", systemImage: "paintpalette") }
         }
@@ -204,60 +201,6 @@ struct FolderTreeLevel: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
-    }
-}
-
-// MARK: - Folder names
-
-struct FolderNameSettings: View {
-    @ObservedObject var vm: ImportViewModel
-    @State private var newName = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Metrics.regular) {
-            Text("Folder names offered when assigning a card's photos or videos.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-
-            List {
-                ForEach(vm.dropdownBuckets, id: \.self) { name in
-                    HStack {
-                        Image(systemName: "folder").foregroundStyle(.secondary)
-                        Text(name)
-                        Spacer()
-                        Button(role: .destructive) {
-                            vm.dropdownBuckets.removeAll { $0 == name }
-                            vm.saveDropdownBuckets()
-                        } label: {
-                            Image(systemName: "trash")
-                        }
-                        .buttonStyle(.plain)
-                        .iconOnlyLabel("Remove \(name)")
-                    }
-                }
-                .onMove { source, destination in
-                    vm.dropdownBuckets.move(fromOffsets: source, toOffset: destination)
-                    vm.saveDropdownBuckets()
-                }
-            }
-            .frame(minHeight: 200)
-
-            HStack {
-                TextField("New folder name", text: $newName)
-                    .onSubmit(add)
-                Button("Add", action: add)
-                    .disabled(ImportViewModel.sanitizeFolderName(newName).isEmpty)
-            }
-        }
-        .padding(Metrics.section)
-    }
-
-    private func add() {
-        let clean = ImportViewModel.sanitizeFolderName(newName)
-        guard !clean.isEmpty, !vm.dropdownBuckets.contains(clean) else { return }
-        vm.dropdownBuckets.append(clean)
-        vm.saveDropdownBuckets()
-        newName = ""
     }
 }
 

@@ -55,6 +55,7 @@ SD Card File Importer/
 │   ├── FileScanningService    Volume detection, media discovery, EXIF dates
 │   ├── FileImportService      Streaming copy, SHA-256 verification, eject
 │   ├── DestinationPlanner     Where a file will land, and under what name
+│   ├── DestinationFolderLister  Folders that exist in the destination
 │   ├── TransferRateEstimator  Rolling-window transfer rate and time remaining
 │   ├── ThumbnailService       QuickLook thumbnail generation and caching
 │   └── PermissionService      Security-scoped bookmarks for sandbox access

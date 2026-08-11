@@ -69,8 +69,10 @@ final class ImportViewModel: ObservableObject {
     @Published var customBucketsPhotos: [String: String] = [:]
     @Published var customBucketsVideos: [String: String] = [:]
 
-    @AppStorage("customDropdownBucketsJSON") var customDropdownBucketsJSON: Data?
-    @Published var dropdownBuckets: [String] = []
+    /// The folder names the per-card pickers offer: whatever exists in the
+    /// destination right now. Re-read when the destination changes and after an
+    /// import, which is the other moment folders appear.
+    @Published var destinationFolders: [String] = []
 
     /// Optional map of specific volume names to folder names.
     let volumeBucketOverride: [String: String] = [:]
@@ -86,6 +88,7 @@ final class ImportViewModel: ObservableObject {
             } else {
                 destinationStorage = nil
             }
+            refreshDestinationFolders()
         }
     }
 
@@ -195,6 +198,10 @@ final class ImportViewModel: ObservableObject {
         defer {
             isImporting = false
             isCancelling = false
+            // An import is the one thing that creates folders in the
+            // destination, so the pickers would otherwise not offer a folder
+            // until the next relaunch.
+            refreshDestinationFolders()
         }
 
         lastResult = nil
@@ -367,6 +374,15 @@ final class ImportViewModel: ObservableObject {
     func updateDestinationStorage() {
         guard let url = destinationURL else { return }
         destinationStorage = getStorageInfo(for: url)
+    }
+
+    /// Re-reads the destination's folders for the per-card pickers.
+    func refreshDestinationFolders() {
+        guard let url = destinationURL else {
+            destinationFolders = []
+            return
+        }
+        destinationFolders = DestinationFolderLister.folders(in: url)
     }
 
     func getStorageInfo(for url: URL) -> (total: Int64, available: Int64)? {

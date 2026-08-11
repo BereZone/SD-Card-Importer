@@ -28,29 +28,11 @@ extension ImportViewModel {
             customBucketsVideos = (try? JSONDecoder()
                 .decode([String: String].self, from: dataVideos)) ?? [:]
         }
-
-        if let dropData = customDropdownBucketsJSON,
-           let decoded = try? JSONDecoder().decode([String].self, from: dropData) {
-            // "Auto-Detect" and "Custom..." used to be stored as list entries and
-            // rendered as if they were folder names. They are picker affordances,
-            // so the picker supplies them and they are filtered out of stored lists
-            // written by earlier versions.
-            dropdownBuckets = decoded.filter { $0 != "Auto-Detect" && $0 != "Custom..." }
-        } else {
-            // Generic starting points. The previous defaults were one person's
-            // camera bag (Pocket3, Action4, A7C, Mini4Pro), which meant every new
-            // user's first screen was full of hardware they do not own.
-            dropdownBuckets = ["Camera", "Drone", "Action Cam", "Phone"]
-        }
     }
 
     func saveCustomBuckets() {
         customSourceBucketsPhotosJSON = try? JSONEncoder().encode(customBucketsPhotos)
         customSourceBucketsVideosJSON = try? JSONEncoder().encode(customBucketsVideos)
-    }
-
-    func saveDropdownBuckets() {
-        customDropdownBucketsJSON = try? JSONEncoder().encode(dropdownBuckets)
     }
 
     func setCustomPhotosBucket(for url: URL, bucket: String) {
