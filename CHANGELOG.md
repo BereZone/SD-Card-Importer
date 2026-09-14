@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-14
+
 ### Added
 
 - Quick Look now steps through the files on screen with ← and →, and with
@@ -210,7 +212,8 @@ foldering — but almost everything you look at while it runs is new.
 
 - Initial release.
 
-[Unreleased]: https://github.com/BereZone/SD-Card-Importer/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/BereZone/SD-Card-Importer/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/BereZone/SD-Card-Importer/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/BereZone/SD-Card-Importer/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/BereZone/SD-Card-Importer/compare/v1.0...v1.1.0
 [1.0.0]: https://github.com/BereZone/SD-Card-Importer/releases/tag/v1.0
