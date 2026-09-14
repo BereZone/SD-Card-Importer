@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Quick Look now steps through the files on screen with ← and →, and with
+  the panel's own arrows, instead of previewing one file at a time.
+
 ### Changed
 
 - One click on a file now selects or deselects it, in both the grid and the

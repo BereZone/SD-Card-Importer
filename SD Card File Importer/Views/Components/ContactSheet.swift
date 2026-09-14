@@ -42,6 +42,28 @@ struct ContactSheet: View {
         vm.candidates(onCard: cardRoot)
     }
 
+    /// The files grouped by shoot day, newest day first. Shared by the Days
+    /// layout and by Quick Look, so ← and → in the preview step through the
+    /// files in the order they appear on screen.
+    private var dayGroups: [(day: Date, items: [ImportCandidate])] {
+        let groups = Dictionary(grouping: files) { candidate in
+            Calendar.current.startOfDay(for: candidate.date)
+        }
+        return groups.keys.sorted(by: >).map { (day: $0, items: groups[$0] ?? []) }
+    }
+
+    /// Every URL on screen, in display order. Handing Quick Look the whole
+    /// collection rather than one URL is what gives the panel its previous and
+    /// next arrows and the ← → keys.
+    private var displayedURLs: [URL] {
+        switch layout {
+        case .grid, .list:
+            return files.map(\.url)
+        case .days:
+            return dayGroups.flatMap { $0.items.map(\.url) }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -53,7 +75,7 @@ struct ContactSheet: View {
                 content
             }
         }
-        .quickLookPreview($quickLookURL)
+        .quickLookPreview($quickLookURL, in: displayedURLs)
     }
 
     // MARK: - Header
@@ -148,20 +170,15 @@ struct ContactSheet: View {
     /// photographer thinks about a card — so it survives the redesign as one of
     /// three views rather than one of four near-identical file browsers.
     private var daysBody: some View {
-        let groups = Dictionary(grouping: files) { candidate in
-            Calendar.current.startOfDay(for: candidate.date)
-        }
-        let days = groups.keys.sorted(by: >)
-
-        return LazyVStack(alignment: .leading, spacing: Metrics.section, pinnedViews: [.sectionHeaders]) {
-            ForEach(days, id: \.self) { day in
+        LazyVStack(alignment: .leading, spacing: Metrics.section, pinnedViews: [.sectionHeaders]) {
+            ForEach(dayGroups, id: \.day) { group in
                 Section {
-                    gridBody(groups[day] ?? [])
+                    gridBody(group.items)
                 } header: {
                     HStack {
-                        Text(day.formatted(date: .complete, time: .omitted))
+                        Text(group.day.formatted(date: .complete, time: .omitted))
                             .font(.headline)
-                        StatusChip(text: "\(groups[day]?.count ?? 0)")
+                        StatusChip(text: "\(group.items.count)")
                         Spacer()
                     }
                     .padding(.horizontal, Metrics.gutter)
