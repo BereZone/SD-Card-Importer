@@ -199,7 +199,9 @@ Non-negotiable, and checked on every change:
 
 - Every control has an accessible name. No `Toggle("")`.
 - The whole primary flow is completable by keyboard: ⌘R refresh, ⌘A / ⇧⌘A
-  select all and none, ⌘Return import, Escape cancel, Space to Quick Look.
+  select all and none, ⌘Return import, Escape cancel, Space toggles the
+  focused file. Quick Look is a small eye button on every file, and a
+  context-menu item.
 - Focus is always visible, including on custom button styles.
 - Progress and completion are announced (`.accessibilityValue`, and an
   announcement on finish).

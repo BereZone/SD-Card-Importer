@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- One click on a file now selects or deselects it, in both the grid and the
+  list. Quick Look moved to a small eye button on each file, and the
+  imported/failed badge moved to the bottom corner of the thumbnail to
+  make room for it. The corner checkbox still works; it was just a small
+  target to hit five hundred times.
 - A card's Photos and Videos pickers now offer the folders that actually exist
   in your destination, so you can file a card straight into one you already
   keep. The folder becomes the base and the dated subfolders are still built

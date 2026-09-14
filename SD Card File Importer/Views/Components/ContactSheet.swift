@@ -214,13 +214,14 @@ struct ContactSheetCell: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Metrics.tight) {
-            // A real Button, so Quick Look is reachable by keyboard and by
-            // VoiceOver. It was an onTapGesture on a plain HStack, which is not
-            // a control and had no activation path at all without a mouse.
-            // The checkbox sits outside the Quick Look button rather than inside
-            // its label — a control nested in a button's label never receives
-            // its own clicks, because the button swallows them.
-            Button(action: onPreview) {
+            // The picture itself toggles the file — far easier to hit than
+            // the small corner checkbox — and a real Button, so the toggle is
+            // reachable by keyboard and by VoiceOver. Quick Look is its own
+            // small button in the opposite corner. Both corner controls sit
+            // outside the toggle button rather than inside its label — a
+            // control nested in a button's label never receives its own
+            // clicks, because the button swallows them.
+            Button(action: { vm.toggleSelection(for: candidate) }) {
                 ThumbnailView(url: candidate.url, size: size, show: showThumbnail)
                     .overlay {
                         RoundedRectangle(cornerRadius: Metrics.radiusControl, style: .continuous)
@@ -229,10 +230,12 @@ struct ContactSheetCell: View {
                     .opacity(isSelected ? 1 : 0.5)
             }
             .buttonStyle(.plain)
-            .help("Quick Look \(candidate.url.lastPathComponent)")
-            .accessibilityLabel("Preview \(candidate.url.lastPathComponent)")
+            .help(isSelected ? "Click to skip this file" : "Click to import this file")
+            .accessibilityLabel("Import \(candidate.url.lastPathComponent)")
+            .accessibilityValue(isSelected ? "Selected" : "Skipped")
             .overlay(alignment: .topLeading) { selectionToggle }
-            .overlay(alignment: .topTrailing) { outcomeBadge }
+            .overlay(alignment: .topTrailing) { quickLookButton }
+            .overlay(alignment: .bottomTrailing) { outcomeBadge }
 
             Text(candidate.url.lastPathComponent)
                 .font(.caption)
@@ -276,6 +279,11 @@ struct ContactSheetCell: View {
         .padding(Metrics.tight)
     }
 
+    private var quickLookButton: some View {
+        QuickLookButton(name: candidate.url.lastPathComponent, onBackdrop: true, action: onPreview)
+            .padding(Metrics.tight)
+    }
+
     @ViewBuilder
     private var outcomeBadge: some View {
         if isFailed {
@@ -314,11 +322,7 @@ struct FileRow: View {
             .toggleStyle(.checkbox)
             .labelsHidden()
 
-            Button(action: onPreview) {
-                ThumbnailView(url: candidate.url, size: 28, show: showThumbnail, fixedSquare: true)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Preview \(candidate.url.lastPathComponent)")
+            ThumbnailView(url: candidate.url, size: 28, show: showThumbnail, fixedSquare: true)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(candidate.url.lastPathComponent)
@@ -353,17 +357,51 @@ struct FileRow: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 72, alignment: .trailing)
+
+            QuickLookButton(name: candidate.url.lastPathComponent, action: onPreview)
         }
         .padding(.horizontal, Metrics.gutter)
         .padding(.vertical, Metrics.snug)
         .opacity(isSelected ? 1 : 0.5)
         .contentShape(Rectangle())
+        // The whole row toggles the file; the checkbox keeps the keyboard and
+        // VoiceOver path to the same toggle, and the eye button is Quick Look.
+        // A child control wins over this row gesture, so clicking either
+        // control does not also toggle the row.
+        .onTapGesture { vm.toggleSelection(for: candidate) }
         .contextMenu {
             Button("Quick Look") { onPreview() }
             Button("Reveal on Card") {
                 NSWorkspace.shared.activateFileViewerSelecting([candidate.url])
             }
         }
+    }
+}
+
+/// The small eye that opens Quick Look on one file, shared by the grid cell
+/// and the list row so the two views agree on the glyph and the tooltip.
+struct QuickLookButton: View {
+    let name: String
+    /// Over a thumbnail the eye sits white on a dark circle, like the
+    /// checkbox; on a plain list row it is a bare secondary glyph.
+    var onBackdrop = false
+    let action: () -> Void
+
+    var body: some View {
+        // The circle is part of the label, not a modifier on the button, so
+        // the whole circle is the click target rather than just the glyph.
+        Button(action: action) {
+            Image(systemName: "eye")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(onBackdrop ? Color.white : Color.secondary)
+                .frame(width: 16, height: 16)
+                .padding(onBackdrop ? Metrics.tight : 0)
+                .background(.black.opacity(onBackdrop ? 0.3 : 0), in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help("Quick Look \(name)")
+        .accessibilityLabel("Quick Look \(name)")
     }
 }
 
